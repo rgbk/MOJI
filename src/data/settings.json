@@ -1,0 +1,21 @@
+{
+  "game": {
+    "roundTimer": 60,
+    "puzzlesPerGame": 10,
+    "winCondition": 6,
+    "countdownDuration": 3
+  },
+  "ui": {
+    "timerBarColor": "#FFD700",
+    "timerBarBg": "#333333",
+    "backgroundColor": "#0F0F0F",
+    "correctColor": "#00FF00",
+    "wrongColor": "#FF0000"
+  },
+  "text": {
+    "endGameWin": "{winner} WINS!",
+    "endGameButtons": ["Play Again", "Share Victory"],
+    "waitingForPlayer": "Waiting for opponent...",
+    "readyPrompt": "Click READY when prepared to battle!"
+  }
+}

@@ -12,11 +12,11 @@ export default defineConfig({
       },
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'VibeCodeStack App',
-        short_name: 'VibeApp',
-        description: 'Built with VibeCodeStack template',
-        theme_color: '#000000',
-        background_color: '#ffffff',
+        name: 'MOJI! - Music Guessing Game',
+        short_name: 'MOJI!',
+        description: 'Real-time emoji music guessing game',
+        theme_color: '#0F0F0F',
+        background_color: '#0F0F0F',
         display: 'standalone',
         icons: [
           {
@@ -34,7 +34,9 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 3000,
+    host: true,  // Expose to local network for mobile testing
+    port: 5173,
+    strictPort: true,
     open: true,
   },
   build: {
