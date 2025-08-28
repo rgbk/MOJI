@@ -11,6 +11,34 @@ This project leverages Claude Code's specialized agent system:
 - **📱 mobile-performance-optimizer** - Mobile experience & PWA optimization
 - **⚡ supabase-realtime-specialist** - Real-time multiplayer infrastructure
 
+## **🛡️ CACHE MANAGEMENT DIRECTIVE**
+
+**AUTOMATIC CACHE CLEARING AUTHORIZATION:**
+Claude has been granted permission to automatically clear Vite cache whenever changes may cause caching issues. This prevents stale behavior and ensures code changes are properly reflected.
+
+**Cache clearing is REQUIRED when:**
+- ✅ **API configurations change** (model names, endpoints, headers)
+- ✅ **Environment variables are modified** (`.env` file changes)
+- ✅ **Dependencies are added/updated** (`package.json` changes)
+- ✅ **Build configurations change** (`vite.config.ts`, etc.)
+- ✅ **External service configurations change** (API keys, base URLs)
+
+**Automatic Process:**
+```bash
+# Claude will automatically run:
+rm -rf node_modules/.vite
+# Kill current dev server
+pnpm dev --run-in-background
+```
+
+**Manual Cache Clearing:**
+```bash
+# Use the provided script:
+./scripts/clear-cache.sh
+```
+
+**This directive ensures consistent behavior and prevents debugging sessions caused by stale cached dependencies.**
+
 ---
 
 ## **Quick Start Setup**
