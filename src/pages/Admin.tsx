@@ -183,24 +183,7 @@ export default function Admin() {
     setGenerationError(null);
 
     try {
-      const prompt = `Generate 3-4 creative emojis that represent "${formData.displayAnswer.trim()}" as a ${formData.type || 'song'}. 
-      
-      Rules:
-      - Be creative and visual
-      - Use emojis that hint at the title, artist, or theme
-      - Make it challenging but solvable
-      - Return ONLY the emojis, no other text
-      
-      Example: For "Bohemian Rhapsody" return something like: 👑🎭🎵🌟`;
-
-      const message = await claudeService.client!.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 50,
-        messages: [{ role: "user", content: prompt }]
-      });
-
-      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
-      const cleanEmojis = responseText.trim();
+      const cleanEmojis = await claudeService.generateEmoji(formData.type || 'song', formData.displayAnswer.trim());
       
       if (cleanEmojis) {
         setFormData(prev => ({ ...prev, emoji: cleanEmojis }));

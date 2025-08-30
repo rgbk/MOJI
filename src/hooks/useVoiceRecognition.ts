@@ -1,53 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { audioFeedback } from '../lib/audio'
 
-// TypeScript declarations for Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
-  }
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  maxAlternatives: number
-  start(): void
-  stop(): void
-  abort(): void
-}
-
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition
-}
-
-declare var SpeechRecognition: SpeechRecognitionConstructor
-declare var webkitSpeechRecognition: SpeechRecognitionConstructor
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList
-  resultIndex: number
-}
-
-interface SpeechRecognitionResultList {
-  length: number
-  item(index: number): SpeechRecognitionResult
-  [index: number]: SpeechRecognitionResult
-}
-
-interface SpeechRecognitionResult {
-  length: number
-  item(index: number): SpeechRecognitionAlternative
-  [index: number]: SpeechRecognitionAlternative
-  isFinal: boolean
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string
-  confidence: number
-}
+// SpeechRecognition types are defined in src/types/speech.d.ts
 
 export type VoiceRecognitionState = 
   | 'idle' 
@@ -81,6 +35,9 @@ export interface UseVoiceRecognitionReturn {
   startListening: () => void
   stopListening: () => void
   resetTranscript: () => void
+  // Push-to-Talk specific methods
+  startPushToTalk: () => void
+  stopPushToTalk: () => void
 }
 
 export function useVoiceRecognition(
@@ -135,6 +92,8 @@ export function useVoiceRecognition(
 
     // Handle results
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      console.log('🎤 Voice recognition result:', { eventType: 'result', resultIndex: event.resultIndex, resultsLength: event.results.length })
+      
       let finalTranscript = ''
       let interimTranscript = ''
 
@@ -152,24 +111,22 @@ export function useVoiceRecognition(
       const currentTranscript = finalTranscript || interimTranscript
       const currentConfidence = event.results[event.results.length - 1]?.[0]?.confidence || 0
 
+      console.log('🎤 Transcript update:', { 
+        transcript: currentTranscript, 
+        confidence: currentConfidence, 
+        isFinal: !!finalTranscript 
+      })
+
       setTranscript(currentTranscript)
       setConfidence(currentConfidence)
 
-      // If we have a final result with good confidence, stop listening
-      if (finalTranscript && currentConfidence >= confidenceThreshold) {
-        setState('processing')
-        
-        // Play success sound
-        if (enableAudioFeedback) {
-          audioFeedback.playSuccessSound()
-        }
-        
-        recognition.stop()
-      }
+      // For Push-to-Talk: Always keep listening, never auto-stop based on confidence
+      // The transcript will be submitted when user releases the button
     }
 
     // Handle start
     recognition.onstart = () => {
+      console.log('🎤 Voice recognition started')
       setState('listening')
       setError(null)
       
@@ -178,16 +135,18 @@ export function useVoiceRecognition(
         audioFeedback.playStartListeningSound()
       }
       
-      // Set a timeout to automatically stop listening after 10 seconds
+      // Set a timeout to automatically stop listening after 15 seconds (Push-to-Talk safety)
       timeoutRef.current = setTimeout(() => {
+        console.log('⏰ Push-to-Talk timeout reached (15s)')
         if (recognitionRef.current) {
           recognitionRef.current.stop()
         }
-      }, 10000)
+      }, 15000)
     }
 
     // Handle end
     recognition.onend = () => {
+      console.log('🎤 Voice recognition ended')
       setState('idle')
       
       // Play stop listening sound
@@ -203,6 +162,7 @@ export function useVoiceRecognition(
 
     // Handle errors
     recognition.onerror = (event: any) => {
+      console.error('🎤 Voice recognition error:', event.error)
       setState('error')
       
       let errorMessage = 'Speech recognition error'
@@ -298,6 +258,23 @@ export function useVoiceRecognition(
     }
   }, [])
 
+  // Push-to-Talk specific methods
+  const startPushToTalk = useCallback(() => {
+    console.log('🎤 Starting Push-to-Talk')
+    if (!isSupported || state === 'listening') {
+      console.log('🎤 Cannot start - not supported or already listening')
+      return
+    }
+    startListening()
+  }, [isSupported, state, startListening])
+
+  const stopPushToTalk = useCallback(() => {
+    console.log('🎤 Stopping Push-to-Talk')
+    if (recognitionRef.current && state === 'listening') {
+      recognitionRef.current.stop()
+    }
+  }, [state])
+
   return {
     state,
     transcript: transcript.trim(),
@@ -307,6 +284,9 @@ export function useVoiceRecognition(
     error,
     startListening,
     stopListening,
-    resetTranscript
+    resetTranscript,
+    // Push-to-Talk methods
+    startPushToTalk,
+    stopPushToTalk
   }
 }

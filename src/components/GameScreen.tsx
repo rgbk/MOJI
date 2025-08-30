@@ -17,7 +17,9 @@ function GameScreen({ gameId }: GameScreenProps) {
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [currentPuzzleIndex, setCurrentPuzzleIndex] = useState(0)
   const [player1Score, setPlayer1Score] = useState(0)
-  const [player2Score, setPlayer2Score] = useState(0)
+  // TODO: Enable when multiplayer is implemented
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars  
+  const [player2Score] = useState(0)
   const [timeLeft, setTimeLeft] = useState(settingsService.getRoundTimer())
   const [answer, setAnswer] = useState('')
   const [showError, setShowError] = useState(false)
@@ -226,7 +228,7 @@ function GameScreen({ gameId }: GameScreenProps) {
           isCorrect={lastAnswerCorrect}
           playerWon={roundWinner}
           onNext={handleNextRound}
-          videoUrl={getVideoUrl(currentPuzzle.videoFile)}
+          videoUrl={getVideoUrl(currentPuzzle.videoFile) || undefined}
           links={currentPuzzle.links}
         />
       )}

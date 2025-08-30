@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition'
+import { MicrophoneIcon } from '@heroicons/react/24/solid'
 
 interface AnswerInputProps {
   value: string
@@ -20,10 +21,9 @@ function AnswerInput({
   placeholder = "Type your answer...",
   disabled = false 
 }: AnswerInputProps) {
-  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text')
-  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [isPushToTalkHeld, setIsPushToTalkHeld] = useState(false)
 
-  // Initialize voice recognition
+  // Initialize voice recognition for Push-to-Talk
   const {
     state: voiceState,
     transcript,
@@ -31,42 +31,30 @@ function AnswerInput({
     isSupported: voiceSupported,
     isListening,
     error: voiceError,
-    startListening,
-    stopListening,
+    startPushToTalk,
+    stopPushToTalk,
     resetTranscript
   } = useVoiceRecognition({
     language: 'en-US',
-    continuous: false,
+    continuous: true, // Keep listening while button is held
     interimResults: true,
-    confidenceThreshold: 0.6,
+    confidenceThreshold: 0.0, // Accept all confidence levels
     enableAudioFeedback: true
   })
 
-  // Handle voice input results
+  // Always sync transcript to input field for Push-to-Talk
   useEffect(() => {
-    if (transcript && voiceState === 'processing') {
-      // Set the transcript as the input value
+    if (transcript) {
+      console.log('🎮 Syncing transcript to input:', transcript)
       onChange(transcript)
-      setVoiceTranscript(transcript)
-      
-      // Auto-submit if confidence is high enough
-      if (confidence > 0.8) {
-        setTimeout(() => {
-          onSubmit(transcript)
-          resetTranscript()
-          setVoiceTranscript('')
-        }, 500)
-      }
     }
-  }, [transcript, voiceState, confidence, onChange, onSubmit, resetTranscript])
+  }, [transcript, onChange])
 
   const handleSubmit = () => {
     if (value.trim() && !disabled) {
+      console.log('🎮 Submitting answer:', value.trim())
       onSubmit(value.trim())
-      if (inputMode === 'voice') {
-        resetTranscript()
-        setVoiceTranscript('')
-      }
+      resetTranscript() // Always reset after submit
     }
   }
 
@@ -80,84 +68,113 @@ function AnswerInput({
     onClueRequest()
   }
 
-  const handleVoiceToggle = () => {
-    if (!voiceSupported) return
+  // Push-to-Talk event handlers
+  const handlePushToTalkStart = () => {
+    if (!voiceSupported || disabled) return
+    console.log('🎮 Push-to-Talk started')
+    setIsPushToTalkHeld(true)
+    startPushToTalk()
+  }
 
-    if (isListening) {
-      stopListening()
-    } else if (inputMode === 'voice') {
-      startListening()
-    } else {
-      setInputMode('voice')
-      onChange('')
-      resetTranscript()
-      setVoiceTranscript('')
-      setTimeout(() => startListening(), 100)
+  const handlePushToTalkEnd = () => {
+    if (!voiceSupported || !isPushToTalkHeld) return
+    console.log('🎮 Push-to-Talk ended')
+    setIsPushToTalkHeld(false)
+    stopPushToTalk()
+    
+    // Submit the transcript after stopping
+    if (transcript && transcript.trim()) {
+      setTimeout(() => {
+        handleSubmit()
+      }, 100) // Small delay to ensure recognition has finished
     }
   }
 
-  const handleTextModeSwitch = () => {
-    if (isListening) {
-      stopListening()
-    }
-    setInputMode('text')
-    resetTranscript()
-    setVoiceTranscript('')
+  // Handle mouse events
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    handlePushToTalkStart()
   }
 
-  // Voice button styling based on state
-  const getVoiceButtonStyle = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    e.preventDefault()
+    handlePushToTalkEnd()
+  }
+
+  // Handle touch events
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault()
+    handlePushToTalkStart()
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault()
+    handlePushToTalkEnd()
+  }
+
+  // Handle keyboard events for accessibility
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      if (!isPushToTalkHeld) {
+        handlePushToTalkStart()
+      }
+    }
+  }
+
+  const handleKeyUp = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      handlePushToTalkEnd()
+    }
+  }
+
+  // Push-to-Talk button styling based on state
+  const getPushToTalkButtonStyle = () => {
     if (!voiceSupported) {
       return "bg-gray-800 cursor-not-allowed"
     }
-    if (isListening) {
-      return "bg-red-500 hover:bg-red-600 animate-pulse"
+    if (isListening || isPushToTalkHeld) {
+      return "bg-red-500 hover:bg-red-600 animate-pulse scale-110 shadow-lg shadow-red-500/50"
     }
-    if (inputMode === 'voice') {
-      return "bg-blue-500 hover:bg-blue-600"
-    }
-    return "bg-gray-700 hover:bg-gray-600"
+    return "bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
   }
 
-  const getVoiceButtonTitle = () => {
+  const getPushToTalkButtonTitle = () => {
     if (!voiceSupported) {
       return "Voice input not supported in this browser"
     }
-    if (isListening) {
-      return "Click to stop listening"
+    if (isListening || isPushToTalkHeld) {
+      return "Release to submit your answer"
     }
-    if (inputMode === 'voice') {
-      return "Click to start voice input"
-    }
-    return "Switch to voice input"
+    return "Hold to speak (Push-to-Talk)"
   }
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      {/* Voice feedback area */}
-      {inputMode === 'voice' && (
+      {/* Push-to-Talk feedback area - always shown when voice is supported */}
+      {voiceSupported && (isListening || transcript || voiceError) && (
         <div className="mb-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : voiceState === 'processing' ? 'bg-yellow-500' : 'bg-gray-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${
+                isListening ? 'bg-red-500 animate-pulse' : 
+                voiceState === 'processing' ? 'bg-yellow-500' :
+                voiceState === 'error' ? 'bg-red-600' :
+                'bg-gray-500'
+              }`} />
               <span className="text-sm text-gray-300">
-                {isListening ? 'Listening...' : 
+                {isListening ? 'Hold button and speak...' : 
                  voiceState === 'processing' ? 'Processing...' :
                  voiceState === 'error' ? 'Error' :
-                 'Ready for voice input'}
+                 'Push-to-Talk ready'}
               </span>
             </div>
-            <button
-              onClick={handleTextModeSwitch}
-              className="text-xs text-blue-400 hover:text-blue-300"
-            >
-              Switch to typing
-            </button>
           </div>
           
           {transcript && (
             <div className="text-sm text-white mb-2">
-              <span className="text-gray-400">Heard: </span>
+              <span className="text-gray-400">Transcript: </span>
               <span className="italic">"{transcript}"</span>
               {confidence > 0 && (
                 <span className="text-xs text-gray-400 ml-2">
@@ -177,23 +194,29 @@ function AnswerInput({
 
       {/* Main input area */}
       <div className="flex items-center space-x-2 mb-4">
-        {/* Voice input button */}
+        {/* Push-to-Talk button */}
         <button
-          onClick={handleVoiceToggle}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp} // Stop if mouse leaves while held
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
           disabled={disabled || !voiceSupported}
-          className={`flex-shrink-0 w-12 h-12 ${getVoiceButtonStyle()} disabled:bg-gray-800 rounded-full flex items-center justify-center transition-colors duration-200 relative`}
-          title={getVoiceButtonTitle()}
+          className={`flex-shrink-0 w-12 h-12 ${getPushToTalkButtonStyle()} disabled:bg-gray-800 rounded-full flex items-center justify-center transition-all duration-200 relative select-none`}
+          title={getPushToTalkButtonTitle()}
+          tabIndex={0}
         >
-          {isListening ? (
-            // Listening icon (stop/pause)
-            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-            </svg>
+          {(isListening || isPushToTalkHeld) ? (
+            // Recording icon with pulse animation
+            <div className="relative">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+              <div className="absolute top-0 left-0 w-3 h-3 bg-white rounded-full animate-ping"></div>
+            </div>
           ) : (
             // Microphone icon
-            <svg className="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
-            </svg>
+            <MicrophoneIcon className="w-5 h-5 text-white" />
           )}
           
           {/* Voice not supported indicator */}
@@ -212,19 +235,15 @@ function AnswerInput({
             type="text"
             value={value}
             onChange={(e) => {
-              if (inputMode === 'voice') {
-                setInputMode('text')
-                resetTranscript()
-                setVoiceTranscript('')
-              }
+              // Allow manual editing - it will override transcript
               onChange(e.target.value)
             }}
             onKeyPress={handleKeyPress}
-            placeholder={inputMode === 'voice' ? 'Voice input active...' : placeholder}
-            disabled={disabled || (inputMode === 'voice' && isListening)}
+            placeholder={isListening ? 'Listening... (hold button and speak)' : placeholder}
+            disabled={disabled}
             className={`w-full h-12 px-6 pr-16 bg-gray-800 border rounded-full text-white placeholder-gray-400 focus:outline-none transition-colors duration-200 disabled:opacity-50 ${
-              inputMode === 'voice' 
-                ? 'border-blue-500 focus:border-blue-400' 
+              isListening
+                ? 'border-red-500 focus:border-red-400' 
                 : 'border-gray-600 focus:border-blue-500'
             }`}
             style={{ fontSize: '16px' }} // Prevents zoom on iOS
@@ -255,21 +274,15 @@ function AnswerInput({
 
       {/* Input tips */}
       <div className="text-center text-xs text-gray-500">
-        {inputMode === 'voice' ? (
-          <div>
-            <p>Click the microphone to start listening</p>
-            {voiceSupported && (
-              <p className="mt-1">Speak clearly and answers will be submitted automatically</p>
-            )}
-          </div>
-        ) : (
-          <div>
-            <p>Type your answer and press Enter or tap the arrow</p>
-            {voiceSupported && (
-              <p className="mt-1">Or click the microphone for voice input</p>
-            )}
-          </div>
-        )}
+        <div>
+          <p>Type your answer and press Enter or tap the arrow</p>
+          {voiceSupported && (
+            <p className="mt-1">Or hold the microphone button while speaking (Push-to-Talk)</p>
+          )}
+          {!voiceSupported && (
+            <p className="mt-1 text-yellow-600">Voice input not supported in this browser</p>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -44,7 +44,7 @@ async function testClaudeAPI() {
     try {
       console.log(`Testing ${model}...`);
       
-      const message = await client.messages.create({
+      await client.messages.create({
         model,
         max_tokens: 10,
         messages: [{ role: "user", content: "Hello" }]

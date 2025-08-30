@@ -100,7 +100,7 @@ function AnswerReveal({
       </div>
 
       {/* Video background (if enabled) */}
-      {videoUrl && (
+      {showVideo && videoUrl && (
         <div className="fixed inset-0 -z-10">
           <video
             autoPlay

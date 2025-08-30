@@ -169,33 +169,31 @@ Rules:
     return this.client !== null;
   }
 
-  private generateMockData(type: PuzzleData['type'], answer: string): PuzzleData {
-    // Simple mock data generator for testing
-    const mockData: PuzzleData = {
-      type,
-      answer: answer.toLowerCase(),
-      emoji: "🎵🎶🎤",
-      clues: [
-        `Popular ${type}`,
-        "You've probably heard this before",
-        "Classic hit"
-      ],
-      displayAnswer: answer,
-      genre: "Pop",
-      subGenre: "Mainstream",
-      decade: "2000s",
-      year: 2005,
-      artistType: type === 'artist' ? 'solo' : 'band',
-      country: "USA",
-      region: "California",
-      album: type.includes('album') ? answer : undefined,
-      spotifyUrl: `https://open.spotify.com/search/${encodeURIComponent(answer)}`,
-      appleMusicUrl: `https://music.apple.com/search?term=${encodeURIComponent(answer)}`
-    };
+  async generateEmoji(type: string, answer: string): Promise<string> {
+    if (!this.client) {
+      throw new Error('Claude API key not configured');
+    }
 
-    console.log('🤖 Generated mock data for testing:', mockData);
-    return mockData;
+    const prompt = `Generate 3-4 creative emojis that represent "${answer.trim()}" as a ${type || 'song'}. 
+      
+      Rules:
+      - Be creative and visual
+      - Use emojis that hint at the title, artist, or theme
+      - Make it challenging but solvable
+      - Return ONLY the emojis, no other text
+      
+      Example: For "Bohemian Rhapsody" return something like: 👑🎭🎵🌟`;
+
+    const message = await this.client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 50,
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    return responseText.trim();
   }
+
 }
 
 export const claudeService = new ClaudeService();
