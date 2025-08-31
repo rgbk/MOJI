@@ -101,6 +101,9 @@ export const roomService = {
     if (error) {
       throw new Error(`Failed to join room: ${error.message}`)
     }
+    
+    // Mark this player as Player 2 in sessionStorage
+    sessionStorage.setItem(`room-creator-${roomId}`, 'false')
 
     return data
   },

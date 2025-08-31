@@ -3,6 +3,7 @@ import { cn } from '../lib/utils';
 import { claudeService } from '../lib/claude';
 import { testClaudeAPI } from '../lib/testClaude';
 import SettingsTab from '../components/SettingsTab';
+import UICopyTab from '../components/UICopyTab';
 import { puzzleService, type Puzzle } from '../lib/puzzles';
 
 // Emoji categories for the picker
@@ -38,7 +39,7 @@ export default function Admin() {
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState<string>('Music & Audio');
-  const [activeTab, setActiveTab] = useState<'puzzles' | 'settings'>('puzzles');
+  const [activeTab, setActiveTab] = useState<'puzzles' | 'settings' | 'copy'>('puzzles');
 
   useEffect(() => {
     loadPuzzles();
@@ -265,6 +266,17 @@ export default function Admin() {
             )}
           >
             ⚙️ Settings
+          </button>
+          <button
+            onClick={() => setActiveTab('copy')}
+            className={cn(
+              "px-6 py-3 rounded-lg font-semibold transition-colors",
+              activeTab === 'copy'
+                ? "bg-white/20 text-white"
+                : "bg-white/10 text-white/70 hover:text-white hover:bg-white/15"
+            )}
+          >
+            📝 UI Copy
           </button>
         </div>
 
@@ -554,8 +566,10 @@ export default function Admin() {
             </div>
           )}
             </div>
-          ) : (
+          ) : activeTab === 'settings' ? (
             <SettingsTab />
+          ) : (
+            <UICopyTab />
           )}
         </div>
       </div>

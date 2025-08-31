@@ -9,6 +9,7 @@ import { settingsService } from '../lib/settings'
 import { puzzleService, type Puzzle } from '../lib/puzzles'
 import { roomService, type GameRoom } from '../lib/rooms'
 import { supabase } from '../lib/supabase'
+import { uiCopyService } from '../lib/uiCopy'
 
 interface GameScreenProps {
   gameId: string
@@ -23,6 +24,7 @@ function GameScreen({ gameId }: GameScreenProps) {
   const [roomData, setRoomData] = useState<GameRoom | null>(null)
   const [isMultiplayer, setIsMultiplayer] = useState(false)
   const [playerId] = useState(() => `player_${Date.now()}`)
+  const [isPlayer1, setIsPlayer1] = useState(false)
   const [timeLeft, setTimeLeft] = useState(settingsService.getRoundTimer())
   const [answer, setAnswer] = useState('')
   const [showError, setShowError] = useState(false)
@@ -65,6 +67,10 @@ function GameScreen({ gameId }: GameScreenProps) {
           setCurrentPuzzleIndex(roomDataResult.current_puzzle_index || 0)
           setPlayer1Score(roomDataResult.player1_score || 0)
           setPlayer2Score(roomDataResult.player2_score || 0)
+          
+          // Determine if this is player 1 (room creator)
+          const isCreator = sessionStorage.getItem(`room-creator-${gameId}`) === 'true'
+          setIsPlayer1(isCreator)
           
           const allPuzzles = await puzzleService.getPuzzles()
           const gamePuzzles = roomDataResult.puzzle_sequence.map(id => 
@@ -199,17 +205,21 @@ function GameScreen({ gameId }: GameScreenProps) {
     if (isCorrect) {
       if (isMultiplayer && roomData) {
         // Multiplayer: Update room state for all players to see
-        const newScore = player1Score + 1
+        const winnerKey = isPlayer1 ? 'player1' : 'player2'
+        const scoreKey = isPlayer1 ? 'player1_score' : 'player2_score'
+        const currentScore = isPlayer1 ? player1Score : player2Score
+        const newScore = currentScore + 1
+        
         await roomService.updateGameState(gameId, {
           game_state: 'showing_answer',
-          round_winner: 'player1',
-          player1_score: newScore,
+          round_winner: winnerKey,
+          [scoreKey]: newScore,
           players_ready_for_next: []
         })
         
         // Check win condition
         if (newScore >= winCondition) {
-          console.log('Player 1 wins the game!', { score: newScore, winCondition })
+          console.log(`${winnerKey} wins the game!`, { score: newScore, winCondition })
           // TODO: Show game over screen
         }
       } else {
@@ -246,13 +256,13 @@ function GameScreen({ gameId }: GameScreenProps) {
       <div className="fixed inset-0 bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="text-4xl mb-4">❌</div>
-          <h2 className="text-xl font-bold mb-2">Failed to Load Puzzles</h2>
+          <h2 className="text-xl font-bold mb-2">{uiCopyService.getValue('game.error.title')}</h2>
           <p className="text-red-400 mb-4">{loadingError}</p>
           <button 
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
-            Reload Game
+            {uiCopyService.getValue('game.error.reload')}
           </button>
         </div>
       </div>
@@ -266,7 +276,7 @@ function GameScreen({ gameId }: GameScreenProps) {
       <div className="fixed inset-0 bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">⏳</div>
-          <p>Loading puzzles...</p>
+          <p>{uiCopyService.getValue('game.waiting')}</p>
           <p className="text-sm mt-2 opacity-70">
             Loaded: {puzzles.length} puzzles, Index: {currentPuzzleIndex}
           </p>
@@ -284,17 +294,19 @@ function GameScreen({ gameId }: GameScreenProps) {
           <PlayerAvatar
             playerId="player1"
             score={player1Score}
-            isActive={true}
+            isActive={isPlayer1}
+            isYou={isPlayer1}
           />
           
           <div className="text-center">
-            <p className="text-sm text-gray-400">Game: {gameId}</p>
+            <p className="text-sm text-gray-400">{uiCopyService.getValue('game.room.label')} {gameId}</p>
           </div>
           
           <PlayerAvatar
             playerId="player2"
             score={player2Score}
-            isActive={false}
+            isActive={!isPlayer1}
+            isYou={!isPlayer1}
           />
         </div>
 
@@ -319,7 +331,7 @@ function GameScreen({ gameId }: GameScreenProps) {
             onSubmit={handleAnswerSubmit}
             onClueRequest={handleClueRequest}
             clueCount={cluesUsed}
-            placeholder="Type your guess..."
+            placeholder={uiCopyService.getValue('game.input.placeholder')}
           />
         </div>
       </div>
@@ -335,6 +347,7 @@ function GameScreen({ gameId }: GameScreenProps) {
           links={currentPuzzle.links}
           isMultiplayer={isMultiplayer}
           waitingForOtherPlayer={waitingForOtherPlayer}
+          isPlayer1={isPlayer1}
         />
       )}
     </div>

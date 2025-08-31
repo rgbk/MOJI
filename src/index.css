@@ -38,4 +38,13 @@
     25% { transform: translateX(-10px); }
     75% { transform: translateX(10px); }
   }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  @keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(-5px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
 }

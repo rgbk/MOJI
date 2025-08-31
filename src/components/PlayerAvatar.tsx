@@ -1,14 +1,16 @@
 import Avatar from 'boring-avatars'
 import { cn } from '../lib/utils'
+import { uiCopyService } from '../lib/uiCopy'
 
 interface PlayerAvatarProps {
   playerId: string
   score: number
   isActive: boolean
+  isYou?: boolean
   size?: number
 }
 
-function PlayerAvatar({ playerId, score, isActive, size = 60 }: PlayerAvatarProps) {
+function PlayerAvatar({ playerId, score, isActive, isYou = false, size = 60 }: PlayerAvatarProps) {
   return (
     <div className="flex items-center space-x-3">
       <div className="flex flex-col items-center">
@@ -39,7 +41,7 @@ function PlayerAvatar({ playerId, score, isActive, size = 60 }: PlayerAvatarProp
         
         {/* Player indicator */}
         <div className="text-xs text-gray-500 mt-1">
-          {playerId === 'player1' ? 'YOU' : 'OPP'}
+          {isYou ? uiCopyService.getValue('game.player.you') : uiCopyService.getValue('game.player.opponent')}
         </div>
       </div>
     </div>

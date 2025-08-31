@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import confetti from 'canvas-confetti'
 import { cn } from '../lib/utils'
+import { uiCopyService } from '../lib/uiCopy'
 
 interface AnswerRevealProps {
   answer: string
@@ -12,6 +13,7 @@ interface AnswerRevealProps {
   links?: { name: string; url: string }[]
   isMultiplayer?: boolean
   waitingForOtherPlayer?: boolean
+  isPlayer1?: boolean
 }
 
 function AnswerReveal({ 
@@ -23,10 +25,15 @@ function AnswerReveal({
   videoUrl,
   links = [],
   isMultiplayer = false,
-  waitingForOtherPlayer = false
+  waitingForOtherPlayer = false,
+  isPlayer1 = true
 }: AnswerRevealProps) {
+  const confettiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasPlayedConfetti = useRef(false)
+  
   useEffect(() => {
-    if (isCorrect && playerWon) {
+    if (isCorrect && playerWon && !hasPlayedConfetti.current) {
+      hasPlayedConfetti.current = true
       // Celebrate with confetti!
       confetti({
         particleCount: 100,
@@ -35,7 +42,7 @@ function AnswerReveal({
       })
       
       // Second burst after delay
-      setTimeout(() => {
+      confettiTimeoutRef.current = setTimeout(() => {
         confetti({
           particleCount: 50,
           spread: 120,
@@ -43,7 +50,27 @@ function AnswerReveal({
         })
       }, 500)
     }
+    
+    // Cleanup on unmount
+    return () => {
+      if (confettiTimeoutRef.current) {
+        clearTimeout(confettiTimeoutRef.current)
+      }
+      confetti.reset()
+      hasPlayedConfetti.current = false
+    }
   }, [isCorrect, playerWon])
+  
+  const handleNextClick = () => {
+    // Stop all confetti animations immediately
+    if (confettiTimeoutRef.current) {
+      clearTimeout(confettiTimeoutRef.current)
+      confettiTimeoutRef.current = null
+    }
+    confetti.reset()
+    hasPlayedConfetti.current = false
+    onNext()
+  }
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="max-w-md w-full mx-4 text-center">
@@ -61,7 +88,15 @@ function AnswerReveal({
             <span className={cn(
               playerWon === 'player1' ? 'text-blue-400' : 'text-red-400'
             )}>
-              {playerWon === 'player1' ? 'YOU' : 'OPPONENT'} WON!
+              {isMultiplayer ? (
+                // In multiplayer, show from each player's perspective
+                (isPlayer1 && playerWon === 'player1') || (!isPlayer1 && playerWon === 'player2')
+                  ? uiCopyService.getValue('answer.correct.you')
+                  : uiCopyService.getValue('answer.correct.opponent')
+              ) : (
+                // In single player, always show YOU WON
+                uiCopyService.getValue('answer.correct.you')
+              )}
             </span>
           </div>
         )}
@@ -69,7 +104,7 @@ function AnswerReveal({
         {/* Answer display */}
         <div className="bg-gray-800 rounded-xl p-6 mb-6">
           <div className="text-gray-400 text-sm uppercase tracking-wide mb-2">
-            The answer was:
+            {uiCopyService.getValue('answer.label')}
           </div>
           <div className="text-2xl font-bold text-white mb-4">
             {answer}
@@ -96,14 +131,14 @@ function AnswerReveal({
         {/* Next button */}
         {waitingForOtherPlayer ? (
           <div className="w-full py-4 bg-gray-600 rounded-xl text-white font-bold text-lg text-center">
-            <div className="animate-pulse">⏳ Waiting for other player...</div>
+            <div className="animate-pulse">⏳ {uiCopyService.getValue('answer.waiting')}</div>
           </div>
         ) : (
           <button
-            onClick={onNext}
+            onClick={handleNextClick}
             className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-bold text-lg transition-colors duration-200"
           >
-            {isMultiplayer ? 'READY FOR NEXT PUZZLE' : 'READY FOR NEXT ROUND'}
+            {isMultiplayer ? uiCopyService.getValue('answer.next.multi') : uiCopyService.getValue('answer.next.single')}
           </button>
         )}
 

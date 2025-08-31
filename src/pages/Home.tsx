@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { roomService } from '../lib/rooms'
 import { debugSupabase } from '../lib/debug'
+import { uiCopyService } from '../lib/uiCopy'
 
 function Home() {
   const navigate = useNavigate()
@@ -31,10 +32,10 @@ function Home() {
       {/* Game Title */}
       <div className="text-center mb-12">
         <h1 className="text-6xl sm:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 mb-4">
-          MOJI!
+          {uiCopyService.getValue('home.title')}
         </h1>
         <p className="text-xl text-gray-400">
-          Guess the song from emoji clues
+          {uiCopyService.getValue('home.subtitle')}
         </p>
       </div>
 
@@ -51,7 +52,7 @@ function Home() {
         disabled={creating}
         className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors duration-200 shadow-lg hover:shadow-purple-500/25"
       >
-        {creating ? 'CREATING ROOM...' : 'START NEW GAME'}
+        {creating ? 'CREATING ROOM...' : uiCopyService.getValue('home.button.start')}
       </button>
     </div>
   )
