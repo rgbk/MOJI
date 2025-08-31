@@ -10,6 +10,8 @@ interface AnswerRevealProps {
   showVideo?: boolean
   videoUrl?: string
   links?: { name: string; url: string }[]
+  isMultiplayer?: boolean
+  waitingForOtherPlayer?: boolean
 }
 
 function AnswerReveal({ 
@@ -19,7 +21,9 @@ function AnswerReveal({
   onNext,
   showVideo = false,
   videoUrl,
-  links = []
+  links = [],
+  isMultiplayer = false,
+  waitingForOtherPlayer = false
 }: AnswerRevealProps) {
   useEffect(() => {
     if (isCorrect && playerWon) {
@@ -90,12 +94,18 @@ function AnswerReveal({
         </div>
 
         {/* Next button */}
-        <button
-          onClick={onNext}
-          className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-bold text-lg transition-colors duration-200"
-        >
-          READY FOR NEXT ROUND
-        </button>
+        {waitingForOtherPlayer ? (
+          <div className="w-full py-4 bg-gray-600 rounded-xl text-white font-bold text-lg text-center">
+            <div className="animate-pulse">⏳ Waiting for other player...</div>
+          </div>
+        ) : (
+          <button
+            onClick={onNext}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-bold text-lg transition-colors duration-200"
+          >
+            {isMultiplayer ? 'READY FOR NEXT PUZZLE' : 'READY FOR NEXT ROUND'}
+          </button>
+        )}
 
       </div>
 

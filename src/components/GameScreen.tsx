@@ -7,6 +7,8 @@ import AnswerReveal from './AnswerReveal'
 import { getVideoUrl } from '../lib/video'
 import { settingsService } from '../lib/settings'
 import { puzzleService, type Puzzle } from '../lib/puzzles'
+import { roomService, type GameRoom } from '../lib/rooms'
+import { supabase } from '../lib/supabase'
 
 interface GameScreenProps {
   gameId: string
@@ -17,9 +19,10 @@ function GameScreen({ gameId }: GameScreenProps) {
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [currentPuzzleIndex, setCurrentPuzzleIndex] = useState(0)
   const [player1Score, setPlayer1Score] = useState(0)
-  // TODO: Enable when multiplayer is implemented
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars  
-  const [player2Score] = useState(0)
+  const [player2Score, setPlayer2Score] = useState(0)
+  const [roomData, setRoomData] = useState<GameRoom | null>(null)
+  const [isMultiplayer, setIsMultiplayer] = useState(false)
+  const [playerId] = useState(() => `player_${Date.now()}`)
   const [timeLeft, setTimeLeft] = useState(settingsService.getRoundTimer())
   const [answer, setAnswer] = useState('')
   const [showError, setShowError] = useState(false)
@@ -28,6 +31,7 @@ function GameScreen({ gameId }: GameScreenProps) {
   const [showAnswerReveal, setShowAnswerReveal] = useState(false)
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState(false)
   const [roundWinner, setRoundWinner] = useState<'player1' | 'player2' | null>(null)
+  const [waitingForOtherPlayer, setWaitingForOtherPlayer] = useState(false)
   
   // Get current settings
   const roundTimer = settingsService.getRoundTimer()
@@ -44,22 +48,80 @@ function GameScreen({ gameId }: GameScreenProps) {
     return shuffled
   }
 
-  // Load puzzles on component mount
+  // Load puzzles and set up multiplayer on component mount
   useEffect(() => {
     const loadPuzzles = async () => {
       try {
         console.log('🔄 GameScreen: Loading puzzles...')
-        const puzzleData = await puzzleService.getPuzzles()
-        console.log('✅ GameScreen: Loaded puzzles:', puzzleData.length)
         
-        // Randomize puzzle order for each game
-        const shuffledPuzzles = shuffleArray(puzzleData)
+        // Check if this is a multiplayer game with a room
+        const roomDataResult = await roomService.getRoomById(gameId)
         
-        // Limit to puzzlesPerGame setting
-        const gamePuzzles = shuffledPuzzles.slice(0, puzzlesPerGame)
-        console.log(`🎲 GameScreen: Selected ${gamePuzzles.length} random puzzles out of ${puzzleData.length} total`)
+        if (roomDataResult?.puzzle_sequence) {
+          // Multiplayer game - use the room's puzzle sequence
+          console.log('🎮 GameScreen: Loading multiplayer puzzle sequence:', roomDataResult.puzzle_sequence)
+          setIsMultiplayer(true)
+          setRoomData(roomDataResult)
+          setCurrentPuzzleIndex(roomDataResult.current_puzzle_index || 0)
+          setPlayer1Score(roomDataResult.player1_score || 0)
+          setPlayer2Score(roomDataResult.player2_score || 0)
+          
+          const allPuzzles = await puzzleService.getPuzzles()
+          const gamePuzzles = roomDataResult.puzzle_sequence.map(id => 
+            allPuzzles.find(p => p.id === id)
+          ).filter(p => p !== undefined) as Puzzle[]
+          
+          console.log(`✅ GameScreen: Loaded ${gamePuzzles.length} synced puzzles for multiplayer`)
+          setPuzzles(gamePuzzles)
+          
+          // Set up real-time subscription for multiplayer updates
+          const subscription = supabase
+            .channel(`game-${gameId}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'game_rooms',
+                filter: `id=eq.${gameId}`
+              },
+              (payload) => {
+                console.log('🔄 Real-time game update:', payload.new)
+                const updated = payload.new as GameRoom
+                setRoomData(updated)
+                setCurrentPuzzleIndex(updated.current_puzzle_index || 0)
+                setPlayer1Score(updated.player1_score || 0)
+                setPlayer2Score(updated.player2_score || 0)
+                
+                // Handle game state changes
+                if (updated.game_state === 'showing_answer') {
+                  setShowAnswerReveal(true)
+                  setRoundWinner(updated.round_winner as 'player1' | 'player2' || null)
+                  setLastAnswerCorrect(!!updated.round_winner)
+                } else if (updated.game_state === 'playing') {
+                  setShowAnswerReveal(false)
+                  setWaitingForOtherPlayer(false)
+                  setTimeLeft(roundTimer)
+                }
+              }
+            )
+            .subscribe()
+            
+          // Cleanup subscription on unmount
+          return () => {
+            subscription.unsubscribe()
+          }
+        } else {
+          // Single player or fallback - generate random puzzles
+          console.log('👤 GameScreen: Single player mode - generating random puzzles')
+          const puzzleData = await puzzleService.getPuzzles()
+          const shuffledPuzzles = shuffleArray(puzzleData)
+          const gamePuzzles = shuffledPuzzles.slice(0, puzzlesPerGame)
+          
+          console.log(`🎲 GameScreen: Selected ${gamePuzzles.length} random puzzles`)
+          setPuzzles(gamePuzzles)
+        }
         
-        setPuzzles(gamePuzzles)
         setLoadingError(null)
       } catch (error) {
         console.error('❌ GameScreen: Failed to load puzzles:', error)
@@ -67,7 +129,7 @@ function GameScreen({ gameId }: GameScreenProps) {
       }
     }
     loadPuzzles()
-  }, [])
+  }, [gameId, roundTimer])
 
   const currentPuzzle = puzzles[currentPuzzleIndex]
 
@@ -84,46 +146,87 @@ function GameScreen({ gameId }: GameScreenProps) {
     }
   }, [timeLeft, currentPuzzle])
 
-  const handleTimeUp = () => {
-    setLastAnswerCorrect(false)
-    setRoundWinner(null)
-    setShowAnswerReveal(true)
-  }
-
-  const handleNextRound = () => {
-    setShowAnswerReveal(false)
-    setCluesUsed(0)
-    setShowClue(false)
-    setAnswer('')
-    setRoundWinner(null)
-    
-    if (currentPuzzleIndex < puzzles.length - 1) {
-      setCurrentPuzzleIndex(prev => prev + 1)
-      setTimeLeft(roundTimer)
+  const handleTimeUp = async () => {
+    if (isMultiplayer && roomData) {
+      // Multiplayer: Update room state for all players to see
+      await roomService.updateGameState(gameId, {
+        game_state: 'showing_answer',
+        round_winner: undefined,
+        players_ready_for_next: []
+      })
     } else {
-      console.log('Game completed!')
+      // Single player: Handle locally
+      setLastAnswerCorrect(false)
+      setRoundWinner(null)
+      setShowAnswerReveal(true)
     }
   }
 
-  const handleAnswerSubmit = (inputAnswer: string) => {
+  const handleNextRound = async () => {
+    if (isMultiplayer && roomData) {
+      // Multiplayer: Mark this player as ready and wait for both players
+      setWaitingForOtherPlayer(true)
+      await roomService.markPlayerReady(gameId, playerId)
+      
+      // Reset local state
+      setCluesUsed(0)
+      setShowClue(false)
+      setAnswer('')
+      setRoundWinner(null)
+    } else {
+      // Single player: Move to next puzzle immediately
+      setShowAnswerReveal(false)
+      setCluesUsed(0)
+      setShowClue(false)
+      setAnswer('')
+      setRoundWinner(null)
+      
+      if (currentPuzzleIndex < puzzles.length - 1) {
+        setCurrentPuzzleIndex(prev => prev + 1)
+        setTimeLeft(roundTimer)
+      } else {
+        console.log('Game completed!')
+      }
+    }
+  }
+
+  const handleAnswerSubmit = async (inputAnswer: string) => {
     const normalizedAnswer = inputAnswer.toLowerCase().trim()
     const isCorrect = currentPuzzle.answers.some(correctAnswer => 
       normalizedAnswer === correctAnswer.toLowerCase()
     )
 
     if (isCorrect) {
-      const newScore = player1Score + 1
-      setPlayer1Score(newScore)
-      setLastAnswerCorrect(true)
-      setRoundWinner('player1')
-      setShowAnswerReveal(true)
-      setAnswer('')
-      
-      // Check win condition
-      if (newScore >= winCondition) {
-        console.log('Player 1 wins the game!', { score: newScore, winCondition })
-        // TODO: Show game over screen
+      if (isMultiplayer && roomData) {
+        // Multiplayer: Update room state for all players to see
+        const newScore = player1Score + 1
+        await roomService.updateGameState(gameId, {
+          game_state: 'showing_answer',
+          round_winner: 'player1',
+          player1_score: newScore,
+          players_ready_for_next: []
+        })
+        
+        // Check win condition
+        if (newScore >= winCondition) {
+          console.log('Player 1 wins the game!', { score: newScore, winCondition })
+          // TODO: Show game over screen
+        }
+      } else {
+        // Single player: Handle locally
+        const newScore = player1Score + 1
+        setPlayer1Score(newScore)
+        setLastAnswerCorrect(true)
+        setRoundWinner('player1')
+        setShowAnswerReveal(true)
+        
+        // Check win condition
+        if (newScore >= winCondition) {
+          console.log('Player 1 wins the game!', { score: newScore, winCondition })
+          // TODO: Show game over screen
+        }
       }
+      setAnswer('')
     } else {
       setShowError(true)
       setTimeout(() => setShowError(false), 2000)
@@ -230,6 +333,8 @@ function GameScreen({ gameId }: GameScreenProps) {
           onNext={handleNextRound}
           videoUrl={getVideoUrl(currentPuzzle.videoFile) || undefined}
           links={currentPuzzle.links}
+          isMultiplayer={isMultiplayer}
+          waitingForOtherPlayer={waitingForOtherPlayer}
         />
       )}
     </div>
