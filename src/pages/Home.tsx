@@ -1,13 +1,29 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { roomService } from '../lib/rooms'
+import { debugSupabase } from '../lib/debug'
 
 function Home() {
   const navigate = useNavigate()
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleStartNewGame = () => {
-    // TODO: Create room in database and go to lobby
-    // For now, go to single-player game (temporary)
-    const gameId = Math.random().toString(36).substr(2, 8).toUpperCase()
-    navigate(`/game/${gameId}`)
+  const handleStartNewGame = async () => {
+    try {
+      setCreating(true)
+      setError(null)
+      
+      // Debug Supabase connection first
+      console.log('🚀 Starting room creation...')
+      await debugSupabase()
+      
+      const room = await roomService.createRoom()
+      navigate(`/room/${room.id}`)
+    } catch (err) {
+      console.error('❌ Room creation failed:', err)
+      setError(err instanceof Error ? err.message : 'Failed to create room')
+      setCreating(false)
+    }
   }
 
   return (
@@ -22,12 +38,20 @@ function Home() {
         </p>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/50 rounded-lg px-4 py-3 mb-6 max-w-md">
+          <p className="text-red-400">{error}</p>
+        </div>
+      )}
+
       {/* Start Game Button */}
       <button
         onClick={handleStartNewGame}
-        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors duration-200 shadow-lg hover:shadow-purple-500/25"
+        disabled={creating}
+        className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors duration-200 shadow-lg hover:shadow-purple-500/25"
       >
-        START NEW GAME
+        {creating ? 'CREATING ROOM...' : 'START NEW GAME'}
       </button>
     </div>
   )
