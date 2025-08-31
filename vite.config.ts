@@ -7,8 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      disable: process.env.NODE_ENV === 'development',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Completely skip puzzles.json from any caching
+        navigateFallbackDenylist: [/\/puzzles\.json/]
       },
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
@@ -34,7 +37,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    allowedHosts: ['be74dad4e36f.ngrok-free.app'],
+    allowedHosts: ['5895994e126c.ngrok-free.app'],
   },
   build: {
     outDir: 'dist',

@@ -23,7 +23,7 @@ interface PuzzleData {
   puzzles: Puzzle[];
 }
 
-const PUZZLES_KEY = 'moji_puzzles_data';
+// const PUZZLES_KEY = 'moji_puzzles_data'; // Disabled - no more caching
 
 export class PuzzleService {
   private static instance: PuzzleService;
@@ -61,20 +61,11 @@ export class PuzzleService {
 
   private async doLoadPuzzles(): Promise<void> {
     try {
-      console.log('🔄 PuzzleService: Starting to load puzzles...');
+      console.log('🔄 PuzzleService: Loading fresh puzzles from JSON (NO CACHE)...');
       
-      // First try to load from localStorage
-      const stored = localStorage.getItem(PUZZLES_KEY);
-      if (stored) {
-        const data = JSON.parse(stored);
-        this.puzzles = data.puzzles || [];
-        console.log('✅ PuzzleService: Loaded puzzles from localStorage:', this.puzzles.length);
-        return;
-      }
-
-      // Fallback to loading from JSON file
-      console.log('🔄 PuzzleService: Loading from JSON file...');
-      const response = await fetch('/puzzles.json');
+      // ALWAYS load fresh from JSON file - NO CACHING!
+      // This ensures multiplayer sync works correctly
+      const response = await fetch('/puzzles.json?t=' + Date.now()); // Cache bust
       if (!response.ok) {
         throw new Error(`Failed to fetch puzzles.json: ${response.status}`);
       }
@@ -82,9 +73,7 @@ export class PuzzleService {
       const data: PuzzleData = await response.json();
       this.puzzles = data.puzzles || [];
       
-      // Save to localStorage for future use
-      await this.savePuzzlesToStorage();
-      console.log('✅ PuzzleService: Loaded puzzles from JSON and saved to localStorage:', this.puzzles.length);
+      console.log('✅ PuzzleService: Loaded fresh puzzles from JSON:', this.puzzles.length);
     } catch (error) {
       console.error('❌ PuzzleService: Failed to load puzzles:', error);
       this.puzzles = [];
@@ -92,17 +81,15 @@ export class PuzzleService {
     }
   }
 
-  private async savePuzzlesToStorage(): Promise<void> {
-    try {
-      const data = { puzzles: this.puzzles };
-      localStorage.setItem(PUZZLES_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Failed to save puzzles to localStorage:', error);
-      throw error;
-    }
-  }
+  // DISABLED: No more localStorage caching to ensure fresh data
+  // private async savePuzzlesToStorage(): Promise<void> {
+  //   // Caching disabled for multiplayer sync
+  // }
 
   async getPuzzles(): Promise<Puzzle[]> {
+    // Force fresh load every time - no caching!
+    this.isLoaded = false;
+    this.loadingPromise = null;
     await this.loadPuzzles();
     return [...this.puzzles];
   }
@@ -110,12 +97,16 @@ export class PuzzleService {
   async savePuzzles(updatedPuzzles: Puzzle[]): Promise<void> {
     try {
       this.puzzles = [...updatedPuzzles];
-      await this.savePuzzlesToStorage();
       
-      // Notify all listeners
+      // Write to JSON file instead of localStorage
+      // Note: This will only update in-memory for now
+      // In a real app, this would update the server/database
+      
+      // Still notify listeners for live updates
       this.listeners.forEach(listener => listener(this.puzzles));
       
-      console.log('✅ Puzzles saved successfully:', this.puzzles.length);
+      console.log('✅ Puzzles updated in memory (no cache):', this.puzzles.length);
+      console.log('⚠️ Note: Changes only persist during this session');
     } catch (error) {
       console.error('Failed to save puzzles:', error);
       throw error;

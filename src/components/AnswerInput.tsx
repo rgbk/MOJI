@@ -22,6 +22,7 @@ function AnswerInput({
   disabled = false 
 }: AnswerInputProps) {
   const [isPushToTalkHeld, setIsPushToTalkHeld] = useState(false)
+  const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false)
 
   // Initialize voice recognition for Push-to-Talk
   const {
@@ -31,9 +32,11 @@ function AnswerInput({
     isSupported: voiceSupported,
     isListening,
     error: voiceError,
+    permissionGranted,
     startPushToTalk,
     stopPushToTalk,
-    resetTranscript
+    resetTranscript,
+    requestPermission
   } = useVoiceRecognition({
     language: 'en-US',
     continuous: true, // Keep listening while button is held
@@ -49,6 +52,32 @@ function AnswerInput({
       onChange(transcript)
     }
   }, [transcript, onChange])
+
+  // Auto-submit when voice recognition completes and we have a transcript
+  useEffect(() => {
+    if (shouldAutoSubmit && !isListening) {
+      console.log('🎮 Voice stopped listening, checking for auto-submit...', { 
+        transcript, 
+        value, 
+        trimmedTranscript: transcript.trim(),
+        trimmedValue: value.trim()
+      })
+      
+      // Use the input value (which should have the transcript) or the transcript itself
+      const textToSubmit = value.trim() || transcript.trim()
+      
+      if (textToSubmit) {
+        console.log('🎮 Auto-submitting voice input:', textToSubmit)
+        setShouldAutoSubmit(false)
+        setTimeout(() => {
+          handleSubmit()
+        }, 100)
+      } else {
+        console.log('🎮 No text to submit, canceling auto-submit')
+        setShouldAutoSubmit(false)
+      }
+    }
+  }, [shouldAutoSubmit, transcript, value, isListening])
 
   const handleSubmit = () => {
     if (value.trim() && !disabled) {
@@ -69,8 +98,19 @@ function AnswerInput({
   }
 
   // Push-to-Talk event handlers
-  const handlePushToTalkStart = () => {
+  const handlePushToTalkStart = async () => {
     if (!voiceSupported || disabled) return
+    
+    // If permission not granted, request it first
+    if (permissionGranted === false || permissionGranted === null) {
+      console.log('🎮 Requesting microphone permission...')
+      const granted = await requestPermission()
+      if (!granted) {
+        console.log('🎮 Permission denied, cannot start voice input')
+        return
+      }
+    }
+    
     console.log('🎮 Push-to-Talk started')
     setIsPushToTalkHeld(true)
     startPushToTalk()
@@ -78,16 +118,16 @@ function AnswerInput({
 
   const handlePushToTalkEnd = () => {
     if (!voiceSupported || !isPushToTalkHeld) return
-    console.log('🎮 Push-to-Talk ended')
+    console.log('🎮 Push-to-Talk ended, current state:', { 
+      transcript, 
+      value, 
+      isListening 
+    })
     setIsPushToTalkHeld(false)
     stopPushToTalk()
     
-    // Submit the transcript after stopping
-    if (transcript && transcript.trim()) {
-      setTimeout(() => {
-        handleSubmit()
-      }, 100) // Small delay to ensure recognition has finished
-    }
+    // Always mark for auto-submit, let the effect decide if there's text to submit
+    setShouldAutoSubmit(true)
   }
 
   // Handle mouse events
@@ -134,6 +174,9 @@ function AnswerInput({
     if (!voiceSupported) {
       return "bg-gray-800 cursor-not-allowed"
     }
+    if (permissionGranted === false) {
+      return "bg-yellow-600 hover:bg-yellow-700 active:bg-yellow-800"
+    }
     if (isListening || isPushToTalkHeld) {
       return "bg-red-500 hover:bg-red-600 animate-pulse scale-110 shadow-lg shadow-red-500/50"
     }
@@ -144,8 +187,14 @@ function AnswerInput({
     if (!voiceSupported) {
       return "Voice input not supported in this browser"
     }
+    if (permissionGranted === false) {
+      return "Microphone access denied - click to request permission"
+    }
     if (isListening || isPushToTalkHeld) {
       return "Release to submit your answer"
+    }
+    if (permissionGranted === null) {
+      return "Hold to speak (will request microphone permission)"
     }
     return "Hold to speak (Push-to-Talk)"
   }
@@ -219,11 +268,18 @@ function AnswerInput({
             <MicrophoneIcon className="w-5 h-5 text-white" />
           )}
           
-          {/* Voice not supported indicator */}
+          {/* Status indicators */}
           {!voiceSupported && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
               <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
+          {voiceSupported && permissionGranted === false && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
+              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </div>
           )}
@@ -249,11 +305,15 @@ function AnswerInput({
             style={{ fontSize: '16px' }} // Prevents zoom on iOS
           />
           
-          {/* Submit button */}
+          {/* Submit button - make it more prominent when there's text */}
           <button
             onClick={handleSubmit}
             disabled={!value.trim() || disabled}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 rounded-full flex items-center justify-center transition-colors duration-200"
+            className={`absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              value.trim() 
+                ? 'bg-green-500 hover:bg-green-600 scale-110 shadow-lg' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            } disabled:bg-gray-600 disabled:scale-100`}
           >
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -275,12 +335,21 @@ function AnswerInput({
       {/* Input tips */}
       <div className="text-center text-xs text-gray-500">
         <div>
-          <p>Type your answer and press Enter or tap the arrow</p>
-          {voiceSupported && (
+          <p>Type your answer and press Enter or tap the {value.trim() ? 'green' : 'blue'} arrow</p>
+          {voiceSupported && permissionGranted !== false && (
             <p className="mt-1">Or hold the microphone button while speaking (Push-to-Talk)</p>
+          )}
+          {voiceSupported && permissionGranted === false && (
+            <p className="mt-1 text-yellow-400">Microphone access denied - tap microphone to request permission</p>
+          )}
+          {voiceSupported && permissionGranted === null && (
+            <p className="mt-1 text-blue-400">First use will request microphone permission</p>
           )}
           {!voiceSupported && (
             <p className="mt-1 text-yellow-600">Voice input not supported in this browser</p>
+          )}
+          {value.trim() && (
+            <p className="mt-1 text-green-400 font-medium">Ready to submit: "{value.trim()}"</p>
           )}
         </div>
       </div>
