@@ -32,12 +32,6 @@ export default defineConfig({
             },
         }),
     ],
-    server: {
-        host: true, // Expose to local network for mobile testing
-        port: 5173,
-        strictPort: true,
-        open: true,
-    },
     build: {
         outDir: 'dist',
         sourcemap: true,
