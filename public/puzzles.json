@@ -9,12 +9,22 @@
         "Formed in Los Angeles, 1982",
         "Famous for 'Under the Bridge' and funk-rock fusion"
       ],
-      "answers": ["red hot chili peppers", "rhcp", "red hot chilli peppers"],
+      "answers": [
+        "red hot chili peppers",
+        "rhcp",
+        "red hot chilli peppers"
+      ],
       "displayAnswer": "Red Hot Chili Peppers",
       "videoFile": "rhcp-under-the-bridge.mp4",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/artist/0L8ExT028jH3ddEcZwqJJ5"},
-        {"name": "Apple Music", "url": "https://music.apple.com/artist/red-hot-chili-peppers/889780"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/artist/0L8ExT028jH3ddEcZwqJJ5"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/artist/red-hot-chili-peppers/889780"
+        }
       ]
     },
     {
@@ -26,12 +36,21 @@
         "Debut single from 2016",
         "Written by 13-year-old with her brother Finneas"
       ],
-      "answers": ["ocean eyes", "oceaneyes"],
+      "answers": [
+        "ocean eyes",
+        "oceaneyes"
+      ],
       "displayAnswer": "Ocean Eyes - Billie Eilish",
       "videoFile": "billie-eilish-ocean-eyes-official.mp4",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/ocean-eyes/1440833467"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/2uIX8YMNjGMD7441kqyyNU"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/ocean-eyes/1440833467"
+        }
       ]
     },
     {
@@ -43,12 +62,21 @@
         "90s",
         "Seattle"
       ],
-      "answers": ["black hole sun", "blackhole sun"],
+      "answers": [
+        "black hole sun",
+        "blackhole sun"
+      ],
       "displayAnswer": "Black Hole Sun - Soundgarden",
       "videoUrl": "https://www.youtube.com/embed/3mbBbFH9fAg",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/2EoOZnxNgtmZaD8uUmz2nD"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/black-hole-sun/1440876677"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/2EoOZnxNgtmZaD8uUmz2nD"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/black-hole-sun/1440876677"
+        }
       ]
     },
     {
@@ -60,12 +88,21 @@
         "80s",
         "Training Montage"
       ],
-      "answers": ["eye of the tiger", "eye of tiger"],
-      "displayAnswer": "Eye of the Tiger - Survivor",
+      "answers": [
+        "eye of the tiger",
+        "eye of tiger"
+      ],
+      "displayAnswer": "Eye of the Tiger",
       "videoUrl": "https://www.youtube.com/embed/btPJPFnesV4",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/2KH16WveTQWT6KOG9Rg6e2"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/eye-of-the-tiger/596473825"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/2KH16WveTQWT6KOG9Rg6e2"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/eye-of-the-tiger/596473825"
+        }
       ]
     },
     {
@@ -77,12 +114,21 @@
         "90s",
         "French Duo"
       ],
-      "answers": ["around the world daft punk", "around the world by daft punk"],
+      "answers": [
+        "around the world daft punk",
+        "around the world by daft punk"
+      ],
       "displayAnswer": "Around the World - Daft Punk",
       "videoUrl": "https://www.youtube.com/embed/dwDns8x3Jb4",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/1pKYYY0dkg23sQQXi0Q5zN"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/around-the-world/697194953"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/1pKYYY0dkg23sQQXi0Q5zN"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/around-the-world/697194953"
+        }
       ]
     },
     {
@@ -94,29 +140,47 @@
         "2000s",
         "Virtual Band"
       ],
-      "answers": ["gorillaz", "the gorillaz"],
+      "answers": [
+        "gorillaz",
+        "the gorillaz"
+      ],
       "displayAnswer": "Gorillaz",
       "videoUrl": "https://www.youtube.com/embed/1V_xRb0x9aw",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/artist/3AA28KZvwAUcZuOKwyblJQ"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/artist/gorillaz/567072"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/artist/3AA28KZvwAUcZuOKwyblJQ"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/artist/gorillaz/567072"
+        }
       ]
     },
     {
       "id": 7,
       "type": "song",
-      "emoji": "👀👐🏻🔉",
+      "emoji": "👀",
       "clues": [
         "Grunge",
         "90s",
         "MTV Unplugged"
       ],
-      "answers": ["eyes without a face", "eyes without face"],
-      "displayAnswer": "Eyes Without a Face - Billy Idol",
+      "answers": [
+        "eyes without a face",
+        "eyes without face"
+      ],
+      "displayAnswer": "Eyes Without a Face",
       "videoUrl": "https://www.youtube.com/embed/9OFpfTd0EIs",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/5stPKIOGvBPTV5pLqq6268"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/eyes-without-a-face/724454177"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/5stPKIOGvBPTV5pLqq6268"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/eyes-without-a-face/724454177"
+        }
       ]
     },
     {
@@ -128,12 +192,21 @@
         "70s/80s",
         "British Band"
       ],
-      "answers": ["rainbow", "the rainbow"],
+      "answers": [
+        "rainbow",
+        "the rainbow"
+      ],
       "displayAnswer": "Rainbow",
       "videoUrl": "https://www.youtube.com/embed/p3VgV31vmUE",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/artist/6SLbNPqWoZQkNgYXTpLB4H"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/artist/rainbow/487131"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/artist/6SLbNPqWoZQkNgYXTpLB4H"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/artist/rainbow/487131"
+        }
       ]
     },
     {
@@ -145,12 +218,21 @@
         "80s",
         "Minneapolis"
       ],
-      "answers": ["purple rain", "purple rain prince"],
+      "answers": [
+        "purple rain",
+        "purple rain prince"
+      ],
       "displayAnswer": "Purple Rain - Prince",
       "videoUrl": "https://www.youtube.com/embed/TvnYmWpD_T8",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/54X78diSLoUDI3joC2bjMz"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/purple-rain/214145442"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/54X78diSLoUDI3joC2bjMz"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/purple-rain/214145442"
+        }
       ]
     },
     {
@@ -162,12 +244,21 @@
         "70s",
         "Guitar Solo"
       ],
-      "answers": ["money for nothing dire straits", "money for nothing by dire straits"],
+      "answers": [
+        "money for nothing dire straits",
+        "money for nothing by dire straits"
+      ],
       "displayAnswer": "Money for Nothing - Dire Straits",
       "videoUrl": "https://www.youtube.com/embed/wTP2RUD_cL0",
       "links": [
-        {"name": "Spotify", "url": "https://open.spotify.com/track/6GnDn5ln0vme3QirUbEJMb"},
-        {"name": "Apple Music", "url": "https://music.apple.com/us/song/money-for-nothing/1440772312"}
+        {
+          "name": "Spotify",
+          "url": "https://open.spotify.com/track/6GnDn5ln0vme3QirUbEJMb"
+        },
+        {
+          "name": "Apple Music",
+          "url": "https://music.apple.com/us/song/money-for-nothing/1440772312"
+        }
       ]
     }
   ]

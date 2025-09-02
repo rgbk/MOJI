@@ -65,8 +65,20 @@ export function useVoiceRecognition(
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isInitialized = useRef(false)
 
-  // Check browser support on mount
+  // Check browser support and secure context on mount
   useEffect(() => {
+    // Check if we're in a secure context (HTTPS or localhost)
+    const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || 
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    
+    if (!isSecureContext) {
+      console.error('🎤 Microphone access requires HTTPS or localhost')
+      setIsSupported(false)
+      setState('not-supported')
+      setError('Microphone access requires a secure connection (HTTPS)')
+      return
+    }
+
     const SpeechRecognitionAPI = 
       window.SpeechRecognition || window.webkitSpeechRecognition
 
@@ -74,27 +86,13 @@ export function useVoiceRecognition(
       setIsSupported(true)
       setState('idle')
       
-      // Check microphone permission status
-      if (navigator.permissions && navigator.permissions.query) {
-        navigator.permissions.query({ name: 'microphone' as PermissionName })
-          .then((permissionStatus) => {
-            setPermissionGranted(permissionStatus.state === 'granted')
-            console.log('🎤 Microphone permission status:', permissionStatus.state)
-            
-            // Listen for permission changes
-            permissionStatus.onchange = () => {
-              setPermissionGranted(permissionStatus.state === 'granted')
-              console.log('🎤 Microphone permission changed:', permissionStatus.state)
-            }
-          })
-          .catch(() => {
-            console.log('🎤 Cannot check microphone permission')
-            setPermissionGranted(null)
-          })
-      }
+      // Check microphone permission status more robustly
+      checkMicrophonePermission()
     } else {
+      console.warn('🎤 Speech Recognition not supported in this browser')
       setIsSupported(false)
       setState('not-supported')
+      setError('Speech recognition is not supported in this browser')
     }
   }, [])
 
@@ -146,6 +144,36 @@ export function useVoiceRecognition(
       // For Push-to-Talk: Always keep listening, never auto-stop based on confidence
       // The transcript will be submitted when user releases the button
     }
+    
+    // Add more detailed event handlers for debugging
+    recognition.onspeechstart = () => {
+      console.log('🎤 Speech detected - user is speaking')
+    }
+    
+    recognition.onspeechend = () => {
+      console.log('🎤 Speech ended - user stopped speaking')
+    }
+    
+    recognition.onaudiostart = () => {
+      console.log('🎤 Audio capture started')
+    }
+    
+    recognition.onaudioend = () => {
+      console.log('🎤 Audio capture ended')
+    }
+    
+    recognition.onsoundstart = () => {
+      console.log('🎤 Sound detected (may not be speech)')
+    }
+    
+    recognition.onsoundend = () => {
+      console.log('🎤 Sound ended')
+    }
+    
+    recognition.onnomatch = () => {
+      console.log('🎤 No speech match found')
+      setError('No speech was recognized. Please try speaking more clearly.')
+    }
 
     // Handle start
     recognition.onstart = () => {
@@ -183,38 +211,69 @@ export function useVoiceRecognition(
       }
     }
 
-    // Handle errors
+    // Handle errors with enhanced messaging
     recognition.onerror = (event: any) => {
-      console.error('🎤 Voice recognition error:', event.error)
+      console.error('🎤 Voice recognition error:', { 
+        error: event.error, 
+        message: event.message,
+        timestamp: new Date().toISOString()
+      })
       setState('error')
       
       let errorMessage = 'Speech recognition error'
+      let shouldUpdatePermissionStatus = false
       
       switch (event.error) {
         case 'not-allowed':
-          errorMessage = 'Microphone access denied. Please enable microphone permissions.'
+          errorMessage = 'Microphone access denied. Please click the microphone icon in your browser address bar and allow microphone access, then try again.'
+          setPermissionGranted(false)
+          shouldUpdatePermissionStatus = true
           break
         case 'no-speech':
-          errorMessage = 'No speech detected. Please try speaking clearly.'
+          errorMessage = 'No speech detected. Please try speaking clearly into your microphone.'
+          // Don't change permission status for no-speech
           break
         case 'audio-capture':
-          errorMessage = 'No microphone found. Please check your microphone connection.'
+          errorMessage = 'Cannot access your microphone. Please check that your microphone is connected and not being used by another application.'
           break
         case 'network':
-          errorMessage = 'Network error. Please check your internet connection.'
+          errorMessage = 'Network error occurred during speech recognition. Please check your internet connection and try again.'
           break
         case 'aborted':
-          errorMessage = 'Speech recognition was aborted.'
+          errorMessage = 'Speech recognition was stopped.'
+          // Don't show error for user-initiated aborts
+          setState('idle')
+          setError(null)
+          return
+        case 'service-not-allowed':
+          errorMessage = 'Speech recognition service is not allowed. Please enable microphone permissions and ensure you are using HTTPS.'
+          setPermissionGranted(false)
+          shouldUpdatePermissionStatus = true
+          break
+        case 'bad-grammar':
+          errorMessage = 'Speech recognition configuration error. Please try again.'
+          break
+        case 'language-not-supported':
+          errorMessage = 'The selected language is not supported for speech recognition.'
           break
         default:
-          errorMessage = `Speech recognition error: ${event.error}`
+          errorMessage = `Speech recognition error: ${event.error}. Please try again.`
       }
       
       setError(errorMessage)
       
-      // Play error sound
-      if (enableAudioFeedback) {
-        audioFeedback.playErrorSound()
+      // Reset recognition instance if we got a permission error
+      if (shouldUpdatePermissionStatus && recognitionRef.current) {
+        recognitionRef.current = null
+      }
+      
+      // Play error sound (only for actual errors, not aborts)
+      if (enableAudioFeedback && event.error !== 'aborted') {
+        try {
+          audioFeedback.playErrorSound()
+        } catch (audioError) {
+          console.warn('🎤 Failed to play error sound:', audioError)
+        }
       }
       
       if (timeoutRef.current) {
@@ -226,37 +285,152 @@ export function useVoiceRecognition(
     return recognition
   }, [isSupported, continuous, interimResults, language, maxAlternatives, confidenceThreshold, enableAudioFeedback])
 
-  // Start listening function - reuse existing recognition instance
-  const startListening = useCallback(() => {
-    if (!isSupported || state === 'listening') return
+  // Request microphone permission proactively with better error handling
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (!isSupported) {
+      setError('Speech recognition is not supported in this browser')
+      return false
+    }
+    
+    // Check if we're in a secure context
+    const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || 
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    
+    if (!isSecureContext) {
+      setError('Microphone access requires a secure connection (HTTPS)')
+      return false
+    }
+    
+    try {
+      console.log('🎤 Requesting microphone permission...')
+      
+      // Check if navigator.mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('getUserMedia not supported')
+      }
+      
+      // Request permission through getUserMedia (most reliable method)
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      })
+      
+      // Stop all tracks immediately - we just wanted permission
+      stream.getTracks().forEach(track => {
+        track.stop()
+        console.log('🎤 Stopped audio track:', track.kind)
+      })
+      
+      setPermissionGranted(true)
+      setError(null)
+      setState('idle')
+      console.log('🎤 Microphone permission granted successfully')
+      return true
+      
+    } catch (err: any) {
+      console.error('🎤 Microphone permission error:', err)
+      setPermissionGranted(false)
+      setState('error')
+      
+      // Provide specific error messages based on error type
+      let errorMessage = 'Unable to access microphone'
+      
+      if (err.name === 'NotAllowedError') {
+        errorMessage = 'Microphone access denied. Please click the microphone icon in your browser address bar and allow microphone access, then try again.'
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = 'No microphone found. Please connect a microphone and try again.'
+      } else if (err.name === 'NotSupportedError') {
+        errorMessage = 'Microphone access is not supported in this browser.'
+      } else if (err.name === 'NotReadableError') {
+        errorMessage = 'Microphone is being used by another application. Please close other apps using your microphone and try again.'
+      } else if (err.name === 'OverconstrainedError') {
+        errorMessage = 'Microphone settings are not compatible. Please try with a different microphone.'
+      } else if (err.name === 'SecurityError') {
+        errorMessage = 'Microphone access blocked for security reasons. Please use HTTPS.'
+      } else if (err.message && err.message.includes('secure')) {
+        errorMessage = 'Microphone access requires a secure connection (HTTPS).'
+      }
+      
+      setError(errorMessage)
+      return false
+    }
+  }, [isSupported])
+
+  // Start listening function with enhanced permission handling
+  const startListening = useCallback(async () => {
+    if (!isSupported || state === 'listening') {
+      console.log('🎤 Cannot start listening:', { isSupported, state })
+      return
+    }
     
     // Check if permission was explicitly denied
     if (permissionGranted === false) {
-      setState('error')
-      setError('Microphone access denied. Please enable microphone permissions in your browser settings.')
-      return
+      console.log('🎤 Permission previously denied, requesting again...')
+      const granted = await requestPermission()
+      if (!granted) {
+        return // Error message already set by requestPermission
+      }
+    }
+    
+    // If permission status is unknown, request it
+    if (permissionGranted === null) {
+      console.log('🎤 Permission status unknown, requesting...')
+      const granted = await requestPermission()
+      if (!granted) {
+        return // Error message already set by requestPermission
+      }
     }
 
     try {
-      // Ensure we have a recognition instance
-      if (!recognitionRef.current) {
-        recognitionRef.current = initializeRecognition()
+      console.log('🎤 Starting speech recognition...')
+      
+      // Always create a fresh recognition instance to avoid stale state issues
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort()
+        } catch (e) {
+          console.warn('🎤 Could not abort previous recognition:', e)
+        }
+        recognitionRef.current = null
       }
+      
+      recognitionRef.current = initializeRecognition()
       
       if (recognitionRef.current) {
         setTranscript('')
         setConfidence(0)
         setError(null)
+        setState('processing') // Set to processing before start to show loading state
         
-        // Start recognition
+        // Start recognition - this may still fail if permissions changed
         recognitionRef.current.start()
+        console.log('🎤 Speech recognition start() called successfully')
+      } else {
+        throw new Error('Failed to create speech recognition instance')
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error('🎤 Speech recognition start error:', err)
       setState('error')
-      setError('Failed to start speech recognition. Please try again.')
-      console.error('Speech recognition start error:', err)
+      
+      if (err.name === 'InvalidStateError') {
+        setError('Speech recognition is already running. Please wait and try again.')
+        // Reset the recognition instance
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.abort()
+          } catch (abortErr) {
+            console.warn('🎤 Failed to abort recognition:', abortErr)
+          }
+          recognitionRef.current = null
+        }
+      } else {
+        setError('Failed to start speech recognition. Please try again.')
+      }
     }
-  }, [isSupported, state, permissionGranted, initializeRecognition])
+  }, [isSupported, state, permissionGranted, initializeRecognition, requestPermission])
 
   // Stop listening function
   const stopListening = useCallback(() => {
@@ -306,31 +480,36 @@ export function useVoiceRecognition(
     }
   }, [state])
   
-  // Request microphone permission proactively
-  const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (!isSupported) return false
+  // Check microphone permission status
+  const checkMicrophonePermission = useCallback(async () => {
+    if (!isSupported) return
     
     try {
-      // Try to get permission through getUserMedia (more reliable)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // Stop the stream immediately, we just wanted permission
-      stream.getTracks().forEach(track => track.stop())
-      setPermissionGranted(true)
-      setError(null)
-      console.log('🎤 Microphone permission granted')
-      return true
-    } catch (err: any) {
-      console.error('🎤 Microphone permission denied:', err)
-      setPermissionGranted(false)
-      
-      if (err.name === 'NotAllowedError') {
-        setError('Microphone access denied. Please enable microphone permissions.')
-      } else if (err.name === 'NotFoundError') {
-        setError('No microphone found. Please connect a microphone.')
+      // Try using Permissions API first (more reliable for status checking)
+      if (navigator.permissions && navigator.permissions.query) {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        setPermissionGranted(permissionStatus.state === 'granted')
+        console.log('🎤 Microphone permission status:', permissionStatus.state)
+        
+        // Listen for permission changes
+        permissionStatus.onchange = () => {
+          const newState = permissionStatus.state === 'granted'
+          setPermissionGranted(newState)
+          console.log('🎤 Microphone permission changed:', permissionStatus.state)
+          
+          // Clear errors if permission was granted
+          if (newState) {
+            setError(null)
+            setState('idle')
+          }
+        }
       } else {
-        setError('Unable to access microphone. Please check your browser settings.')
+        console.log('🎤 Permissions API not available, will check on first use')
+        setPermissionGranted(null)
       }
-      return false
+    } catch (err) {
+      console.warn('🎤 Cannot check microphone permission:', err)
+      setPermissionGranted(null)
     }
   }, [isSupported])
 

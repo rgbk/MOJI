@@ -98,15 +98,29 @@ export class PuzzleService {
     try {
       this.puzzles = [...updatedPuzzles];
       
-      // Write to JSON file instead of localStorage
-      // Note: This will only update in-memory for now
-      // In a real app, this would update the server/database
+      // Save to file via simple API call
+      try {
+        const response = await fetch('http://localhost:3001/api/puzzles', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ puzzles: updatedPuzzles })
+        });
+
+        if (response.ok) {
+          console.log('✅ Puzzles saved to file!');
+        } else {
+          throw new Error('Save failed');
+        }
+      } catch (error) {
+        console.error('❌ Failed to save to file:', error);
+        alert('Failed to save changes to file. Changes are only in memory.');
+      }
       
       // Still notify listeners for live updates
       this.listeners.forEach(listener => listener(this.puzzles));
       
-      console.log('✅ Puzzles updated in memory (no cache):', this.puzzles.length);
-      console.log('⚠️ Note: Changes only persist during this session');
     } catch (error) {
       console.error('Failed to save puzzles:', error);
       throw error;

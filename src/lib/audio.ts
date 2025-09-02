@@ -5,16 +5,31 @@
 
 export class AudioFeedback {
   private audioContext: AudioContext | null = null
+  private isInitialized = false
 
   constructor() {
-    // Initialize Web Audio Context if available
+    // Don't initialize AudioContext immediately - wait for user interaction
+    // This prevents issues with browser autoplay policies
+  }
+  
+  private initializeAudioContext(): boolean {
+    if (this.isInitialized) return this.audioContext !== null
+    
     if (typeof window !== 'undefined' && (window.AudioContext || (window as any).webkitAudioContext)) {
       try {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        this.isInitialized = true
+        console.log('🎵 AudioContext initialized successfully')
+        return true
       } catch (error) {
-        console.warn('AudioContext not available:', error)
+        console.warn('🎵 AudioContext not available:', error)
+        this.isInitialized = true
+        return false
       }
     }
+    
+    this.isInitialized = true
+    return false
   }
 
   /**
@@ -50,12 +65,18 @@ export class AudioFeedback {
    * Generate and play a tone using Web Audio API
    */
   private playTone(frequency: number, duration: number, volume: number = 0.1): void {
-    if (!this.audioContext) return
+    // Initialize audio context on first use
+    if (!this.initializeAudioContext() || !this.audioContext) {
+      return // Audio not available, fail silently
+    }
 
     try {
       // Resume audio context if it's suspended (required by browser policies)
       if (this.audioContext.state === 'suspended') {
-        this.audioContext.resume()
+        this.audioContext.resume().catch((error) => {
+          console.warn('🎵 Failed to resume AudioContext:', error)
+          return
+        })
       }
 
       const oscillator = this.audioContext.createOscillator()
@@ -75,7 +96,7 @@ export class AudioFeedback {
       oscillator.start(this.audioContext.currentTime)
       oscillator.stop(this.audioContext.currentTime + duration)
     } catch (error) {
-      console.warn('Failed to play audio feedback:', error)
+      console.warn('🎵 Failed to play audio feedback:', error)
     }
   }
 
@@ -83,7 +104,7 @@ export class AudioFeedback {
    * Check if audio feedback is available
    */
   isAvailable(): boolean {
-    return this.audioContext !== null
+    return this.initializeAudioContext() && this.audioContext !== null
   }
 }
 

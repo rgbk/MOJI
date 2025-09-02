@@ -101,12 +101,20 @@ function AnswerInput({
   const handlePushToTalkStart = async () => {
     if (!voiceSupported || disabled) return
     
+    console.log('🎮 Push-to-Talk start requested', { 
+      voiceSupported, 
+      disabled, 
+      permissionGranted,
+      voiceState 
+    })
+    
     // If permission not granted, request it first
     if (permissionGranted === false || permissionGranted === null) {
       console.log('🎮 Requesting microphone permission...')
       const granted = await requestPermission()
       if (!granted) {
         console.log('🎮 Permission denied, cannot start voice input')
+        // Error message is already set by requestPermission
         return
       }
     }
@@ -133,6 +141,14 @@ function AnswerInput({
   // Handle mouse events
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
+    
+    // If permission denied, just request permission (don't start listening)
+    if (permissionGranted === false) {
+      console.log('🎮 Permission denied - requesting permission instead of starting Push-to-Talk')
+      requestPermission()
+      return
+    }
+    
     handlePushToTalkStart()
   }
 
@@ -144,6 +160,14 @@ function AnswerInput({
   // Handle touch events
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault()
+    
+    // If permission denied, just request permission (don't start listening)
+    if (permissionGranted === false) {
+      console.log('🎮 Permission denied - requesting permission instead of starting Push-to-Talk (touch)')
+      requestPermission()
+      return
+    }
+    
     handlePushToTalkStart()
   }
 
@@ -187,8 +211,14 @@ function AnswerInput({
     if (!voiceSupported) {
       return "Voice input not supported in this browser"
     }
+    if (voiceError && voiceError.includes('secure')) {
+      return "HTTPS required for microphone access"
+    }
     if (permissionGranted === false) {
-      return "Microphone access denied - click to request permission"
+      return "Microphone access denied - click to request permission again"
+    }
+    if (voiceState === 'error' && voiceError) {
+      return `Error: ${voiceError}`
     }
     if (isListening || isPushToTalkHeld) {
       return "Release to submit your answer"
@@ -339,11 +369,17 @@ function AnswerInput({
           {voiceSupported && permissionGranted !== false && (
             <p className="mt-1">Or hold the microphone button while speaking (Push-to-Talk)</p>
           )}
-          {voiceSupported && permissionGranted === false && (
+          {voiceSupported && permissionGranted === false && !voiceError?.includes('secure') && (
             <p className="mt-1 text-yellow-400">Microphone access denied - tap microphone to request permission</p>
           )}
-          {voiceSupported && permissionGranted === null && (
+          {voiceSupported && voiceError?.includes('secure') && (
+            <p className="mt-1 text-red-400">HTTPS required for microphone access</p>
+          )}
+          {voiceSupported && permissionGranted === null && !voiceError && (
             <p className="mt-1 text-blue-400">First use will request microphone permission</p>
+          )}
+          {voiceError && !voiceError.includes('secure') && (
+            <p className="mt-1 text-red-400">Voice input error: {voiceError}</p>
           )}
           {!voiceSupported && (
             <p className="mt-1 text-yellow-600">Voice input not supported in this browser</p>
