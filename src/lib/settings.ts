@@ -1,8 +1,12 @@
+import { supabase } from './supabase';
+
 interface GameSettings {
   roundTimer: number;
   puzzlesPerGame: number;
   winCondition: number;
   countdownDuration: number;
+  puzzleOrder: string;
+  sequentialIndex?: number;
 }
 
 interface Settings {
@@ -11,14 +15,14 @@ interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
   game: {
-    roundTimer: 60,
+    roundTimer: 30,
     puzzlesPerGame: 10,
     winCondition: 6,
-    countdownDuration: 3
+    countdownDuration: 3,
+    puzzleOrder: 'sequential',
+    sequentialIndex: 2
   }
 };
-
-const SETTINGS_KEY = 'moji_game_settings';
 
 export class SettingsService {
   private static instance: SettingsService;
@@ -26,7 +30,8 @@ export class SettingsService {
   private listeners: Set<(settings: Settings) => void> = new Set();
 
   private constructor() {
-    this.settings = this.loadSettings();
+    this.settings = DEFAULT_SETTINGS;
+    this.loadSettings(); // Load async in background
   }
 
   static getInstance(): SettingsService {
@@ -36,15 +41,37 @@ export class SettingsService {
     return SettingsService.instance;
   }
 
-  private loadSettings(): Settings {
+  private async loadSettings(): Promise<Settings> {
     try {
-      const stored = localStorage.getItem(SETTINGS_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return { ...DEFAULT_SETTINGS, ...parsed };
+      const { data, error } = await supabase
+        .from('game_settings')
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('Failed to load settings from Supabase:', error);
+        return DEFAULT_SETTINGS;
+      }
+      
+      if (data) {
+        this.settings = {
+          game: {
+            roundTimer: data.round_timer,
+            puzzlesPerGame: data.puzzles_per_game,
+            winCondition: data.win_condition,
+            countdownDuration: data.countdown_duration,
+            puzzleOrder: data.puzzle_order,
+            sequentialIndex: data.sequential_index
+          }
+        };
+        
+        // Notify all listeners
+        this.listeners.forEach(listener => listener(this.settings));
+        
+        return this.settings;
       }
     } catch (error) {
-      console.error('Failed to load settings from localStorage:', error);
+      console.error('Failed to load settings from Supabase:', error);
     }
     return DEFAULT_SETTINGS;
   }
@@ -55,8 +82,25 @@ export class SettingsService {
 
   async saveSettings(newSettings: Settings): Promise<void> {
     try {
+      const { error } = await supabase
+        .from('game_settings')
+        .update({
+          round_timer: newSettings.game.roundTimer,
+          puzzles_per_game: newSettings.game.puzzlesPerGame,
+          win_condition: newSettings.game.winCondition,
+          countdown_duration: newSettings.game.countdownDuration,
+          puzzle_order: newSettings.game.puzzleOrder || 'sequential',
+          sequential_index: newSettings.game.sequentialIndex,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', '5c83e319-7dca-4c31-98f8-cd64ea28aa8a'); // Using the ID from your CSV
+      
+      if (error) {
+        console.error('Failed to save settings to Supabase:', error);
+        throw error;
+      }
+      
       this.settings = { ...newSettings };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
       
       // Notify all listeners
       this.listeners.forEach(listener => listener(this.settings));
@@ -64,7 +108,7 @@ export class SettingsService {
       // Clear Vite cache to ensure settings take effect
       await this.clearViteCache();
       
-      console.log('Settings saved successfully:', this.settings);
+      console.log('Settings saved successfully to Supabase:', this.settings);
     } catch (error) {
       console.error('Failed to save settings:', error);
       throw error;

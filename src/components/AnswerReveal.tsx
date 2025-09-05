@@ -10,6 +10,7 @@ interface AnswerRevealProps {
   onNext: () => void
   showVideo?: boolean
   videoUrl?: string
+  muxPlaybackId?: string
   links?: { name: string; url: string }[]
   isMultiplayer?: boolean
   waitingForOtherPlayer?: boolean
@@ -23,6 +24,7 @@ function AnswerReveal({
   onNext,
   showVideo = false,
   videoUrl,
+  muxPlaybackId,
   links = [],
   isMultiplayer = false,
   waitingForOtherPlayer = false,
@@ -145,16 +147,37 @@ function AnswerReveal({
       </div>
 
       {/* Video background (if enabled) */}
-      {showVideo && videoUrl && (
+      {showVideo && (muxPlaybackId || videoUrl) && (
         <div className="fixed inset-0 -z-10">
-          <video
-            autoPlay
-            muted
-            loop
-            className="w-full h-full object-cover"
-          >
-            <source src={videoUrl} type="video/mp4" />
-          </video>
+          {muxPlaybackId ? (
+            // Use Mux video player
+            <video
+              autoPlay
+              muted
+              loop
+              className="w-full h-full object-cover"
+              poster={`https://image.mux.com/${muxPlaybackId}/thumbnail.jpg?width=1920&height=1080&fit_mode=pad`}
+            >
+              <source 
+                src={`https://stream.mux.com/${muxPlaybackId}.m3u8`} 
+                type="application/x-mpegURL" 
+              />
+              <source 
+                src={`https://stream.mux.com/${muxPlaybackId}/high.mp4`} 
+                type="video/mp4" 
+              />
+            </video>
+          ) : (
+            // Fallback to regular video URL
+            <video
+              autoPlay
+              muted
+              loop
+              className="w-full h-full object-cover"
+            >
+              <source src={videoUrl} type="video/mp4" />
+            </video>
+          )}
           <div className="absolute inset-0 bg-black/60" />
         </div>
       )}

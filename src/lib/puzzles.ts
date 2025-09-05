@@ -1,3 +1,5 @@
+import { supabase } from './supabase'
+
 interface Puzzle {
   id: number;
   type: 'artist' | 'song' | 'song-artist' | 'album';
@@ -7,6 +9,7 @@ interface Puzzle {
   displayAnswer: string;
   videoFile?: string;
   videoUrl?: string;
+  muxPlaybackId?: string; // Add Mux support
   links: { name: string; url: string }[];
   // New fields from AI
   genre?: string;
@@ -17,6 +20,7 @@ interface Puzzle {
   country?: string;
   region?: string;
   album?: string;
+  theme?: string;
 }
 
 interface PuzzleData {
@@ -61,19 +65,45 @@ export class PuzzleService {
 
   private async doLoadPuzzles(): Promise<void> {
     try {
-      console.log('🔄 PuzzleService: Loading fresh puzzles from JSON (NO CACHE)...');
+      console.log('🔄 PuzzleService: Loading puzzles from Supabase...');
       
-      // ALWAYS load fresh from JSON file - NO CACHING!
-      // This ensures multiplayer sync works correctly
-      const response = await fetch('/puzzles.json?t=' + Date.now()); // Cache bust
-      if (!response.ok) {
-        throw new Error(`Failed to fetch puzzles.json: ${response.status}`);
+      const { data, error } = await supabase
+        .from('puzzles')
+        .select('*')
+        .order('id', { ascending: true });
+      
+      if (error) {
+        throw new Error(`Failed to fetch puzzles from Supabase: ${error.message}`);
       }
       
-      const data: PuzzleData = await response.json();
-      this.puzzles = data.puzzles || [];
+      if (data) {
+        // Transform Supabase data to match our Puzzle interface
+        this.puzzles = data.map(row => ({
+          id: row.id,
+          type: row.type,
+          emoji: row.emoji,
+          clues: row.clues,
+          answers: row.answers,
+          displayAnswer: row.display_answer,
+          videoFile: row.video_file,
+          videoUrl: row.video_url,
+          muxPlaybackId: row.mux_playback_id,
+          links: row.links || [],
+          genre: row.genre,
+          subGenre: row.sub_genre,
+          decade: row.decade,
+          year: row.year,
+          artistType: row.artist_type,
+          country: row.country,
+          region: row.region,
+          album: row.album,
+          theme: row.theme
+        }));
+      } else {
+        this.puzzles = [];
+      }
       
-      console.log('✅ PuzzleService: Loaded fresh puzzles from JSON:', this.puzzles.length);
+      console.log('✅ PuzzleService: Loaded puzzles from Supabase:', this.puzzles.length);
     } catch (error) {
       console.error('❌ PuzzleService: Failed to load puzzles:', error);
       this.puzzles = [];
@@ -87,7 +117,15 @@ export class PuzzleService {
   // }
 
   async getPuzzles(): Promise<Puzzle[]> {
-    // Force fresh load every time - no caching!
+    // Load if not already loaded
+    if (!this.isLoaded) {
+      await this.loadPuzzles();
+    }
+    return [...this.puzzles];
+  }
+
+  async refreshPuzzles(): Promise<Puzzle[]> {
+    // Force fresh load
     this.isLoaded = false;
     this.loadingPromise = null;
     await this.loadPuzzles();
@@ -96,27 +134,41 @@ export class PuzzleService {
 
   async savePuzzles(updatedPuzzles: Puzzle[]): Promise<void> {
     try {
-      this.puzzles = [...updatedPuzzles];
-      
-      // Save to file via simple API call
-      try {
-        const response = await fetch('http://localhost:3001/api/puzzles', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ puzzles: updatedPuzzles })
-        });
+      // Transform puzzles to Supabase format and update
+      const promises = updatedPuzzles.map(puzzle => 
+        supabase
+          .from('puzzles')
+          .upsert({
+            id: puzzle.id,
+            type: puzzle.type,
+            emoji: puzzle.emoji,
+            clues: puzzle.clues,
+            answers: puzzle.answers,
+            display_answer: puzzle.displayAnswer,
+            video_file: puzzle.videoFile,
+            video_url: puzzle.videoUrl,
+            mux_playback_id: puzzle.muxPlaybackId,
+            links: puzzle.links,
+            genre: puzzle.genre,
+            sub_genre: puzzle.subGenre,
+            decade: puzzle.decade,
+            year: puzzle.year,
+            artist_type: puzzle.artistType,
+            country: puzzle.country,
+            region: puzzle.region,
+            album: puzzle.album,
+            theme: puzzle.theme,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', puzzle.id)
+      );
 
-        if (response.ok) {
-          console.log('✅ Puzzles saved to file!');
-        } else {
-          throw new Error('Save failed');
-        }
-      } catch (error) {
-        console.error('❌ Failed to save to file:', error);
-        alert('Failed to save changes to file. Changes are only in memory.');
-      }
+      await Promise.all(promises);
+      this.puzzles = [...updatedPuzzles];
+      console.log('✅ Puzzles saved to Supabase!');
+      
+      // Notify listeners
+      this.listeners.forEach(listener => listener(this.puzzles));
       
       // Still notify listeners for live updates
       this.listeners.forEach(listener => listener(this.puzzles));

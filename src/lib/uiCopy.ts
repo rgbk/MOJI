@@ -1,11 +1,22 @@
 // UI Copy Management System
 // All user-facing text strings in one place for easy management
 
+import { supabase } from './supabase'
+
 export interface UICopySection {
   id: string
   name: string
   description: string
   values: Record<string, string>
+}
+
+interface UICopyRow {
+  id: string
+  key: string
+  value: string
+  category: string | null
+  description: string | null
+  updated_at: string | null
 }
 
 const defaultUICopy: UICopySection[] = [
@@ -112,32 +123,115 @@ const defaultUICopy: UICopySection[] = [
 
 class UICopyService {
   private copy: UICopySection[] = []
-  private readonly STORAGE_KEY = 'moji-ui-copy'
+  private copyMap: Map<string, string> = new Map()
+  private isLoaded = false
+  private loadingPromise: Promise<void> | null = null
 
   constructor() {
+    // Initialize with defaults synchronously
+    this.setDefaultCopy()
+    // Load from Supabase in background
     this.loadCopy()
   }
 
-  private loadCopy() {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY)
-      if (stored) {
-        this.copy = JSON.parse(stored)
-      } else {
-        this.copy = defaultUICopy
-        this.saveCopy()
+  private setDefaultCopy() {
+    this.copy = defaultUICopy
+    // Build map for fast lookups
+    for (const section of defaultUICopy) {
+      for (const [key, value] of Object.entries(section.values)) {
+        this.copyMap.set(key, value)
       }
-    } catch (error) {
-      console.error('Failed to load UI copy:', error)
-      this.copy = defaultUICopy
     }
   }
 
-  private saveCopy() {
+  private async loadCopy(): Promise<void> {
+    // Prevent multiple simultaneous loads
+    if (this.loadingPromise) {
+      return this.loadingPromise
+    }
+
+    this.loadingPromise = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ui_copy')
+          .select('*')
+          .order('category', { ascending: true })
+          .order('key', { ascending: true })
+
+        if (error) {
+          console.error('Failed to load UI copy from Supabase:', error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          // Clear and rebuild map from Supabase data
+          this.copyMap.clear()
+          const sections: Map<string, UICopySection> = new Map()
+
+          for (const row of data as UICopyRow[]) {
+            // Store in map for fast lookups
+            this.copyMap.set(row.key, row.value)
+
+            // Build sections structure
+            const category = row.category || 'default'
+            if (!sections.has(category)) {
+              sections.set(category, {
+                id: category,
+                name: this.formatCategoryName(category),
+                description: row.description || '',
+                values: {}
+              })
+            }
+            const section = sections.get(category)!
+            section.values[row.key] = row.value
+          }
+
+          this.copy = Array.from(sections.values())
+          this.isLoaded = true
+          console.log('UI copy loaded from Supabase:', this.copy.length, 'sections')
+        }
+      } catch (error) {
+        console.error('Failed to load UI copy from Supabase:', error)
+      }
+    })()
+
+    return this.loadingPromise
+  }
+
+  private formatCategoryName(category: string): string {
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
+  private async saveCopy(updates: Record<string, string>): Promise<void> {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.copy))
+      // Update local copy immediately
+      for (const [key, value] of Object.entries(updates)) {
+        this.copyMap.set(key, value)
+        // Update in sections
+        for (const section of this.copy) {
+          if (key in section.values) {
+            section.values[key] = value
+            break
+          }
+        }
+      }
+
+      // Save to Supabase
+      const promises = Object.entries(updates).map(([key, value]) => 
+        supabase
+          .from('ui_copy')
+          .update({ value, updated_at: new Date().toISOString() })
+          .eq('key', key)
+      )
+
+      await Promise.all(promises)
+      console.log('UI copy saved to Supabase:', Object.keys(updates).length, 'keys updated')
     } catch (error) {
       console.error('Failed to save UI copy:', error)
+      throw error
     }
   }
 
@@ -150,44 +244,64 @@ class UICopyService {
   }
 
   getValue(key: string): string {
-    const [sectionId] = key.split('.')
-    const section = this.getSection(sectionId)
-    if (!section) return key // Return key if not found
-    return section.values[key] || key
+    // Fast lookup from map
+    const value = this.copyMap.get(key)
+    if (value) {
+      return value
+    }
+    
+    // Return a fallback if key not found
+    console.warn(`UI copy key not found: ${key}`)
+    return key // Return the key itself as fallback
   }
 
-  updateValue(key: string, value: string) {
+  // Ensure data is loaded before use
+  async ensureLoaded(): Promise<void> {
+    if (!this.isLoaded && this.loadingPromise) {
+      await this.loadingPromise
+    }
+  }
+
+  async updateValue(key: string, value: string) {
     const [sectionId] = key.split('.')
     const section = this.copy.find(s => s.id === sectionId)
     if (section) {
       section.values[key] = value
-      this.saveCopy()
+      await this.saveCopy({ [key]: value })
     }
   }
 
-  updateSection(sectionId: string, values: Record<string, string>) {
+  async updateSection(sectionId: string, values: Record<string, string>) {
     const section = this.copy.find(s => s.id === sectionId)
     if (section) {
       section.values = { ...section.values, ...values }
-      this.saveCopy()
+      await this.saveCopy(values)
     }
   }
 
-  resetToDefaults() {
-    this.copy = JSON.parse(JSON.stringify(defaultUICopy))
-    this.saveCopy()
+  async resetToDefaults() {
+    this.setDefaultCopy()
+    const updates: Record<string, string> = {}
+    for (const section of defaultUICopy) {
+      Object.assign(updates, section.values)
+    }
+    await this.saveCopy(updates)
   }
 
   exportCopy(): string {
     return JSON.stringify(this.copy, null, 2)
   }
 
-  importCopy(jsonString: string): boolean {
+  async importCopy(jsonString: string): Promise<boolean> {
     try {
       const imported = JSON.parse(jsonString)
       if (Array.isArray(imported)) {
         this.copy = imported
-        this.saveCopy()
+        const updates: Record<string, string> = {}
+        for (const section of imported) {
+          Object.assign(updates, section.values)
+        }
+        await this.saveCopy(updates)
         return true
       }
       return false

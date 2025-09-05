@@ -44,18 +44,18 @@ export default function UICopyTab() {
     setHasChanges(true)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedSection) {
-      uiCopyService.updateSection(selectedSection, editingValues)
+      await uiCopyService.updateSection(selectedSection, editingValues)
       loadSections()
       setHasChanges(false)
       alert('UI copy saved successfully!')
     }
   }
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm('Reset all UI copy to defaults? This cannot be undone.')) {
-      uiCopyService.resetToDefaults()
+      await uiCopyService.resetToDefaults()
       loadSections()
       setHasChanges(false)
     }
@@ -82,7 +82,8 @@ export default function UICopyTab() {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
         const text = await file.text()
-        if (uiCopyService.importCopy(text)) {
+        const success = await uiCopyService.importCopy(text)
+        if (success) {
           loadSections()
           setHasChanges(false)
           alert('UI copy imported successfully!')

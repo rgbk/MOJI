@@ -344,6 +344,7 @@ function GameScreen({ gameId }: GameScreenProps) {
           playerWon={roundWinner}
           onNext={handleNextRound}
           videoUrl={getVideoUrl(currentPuzzle.videoFile) || undefined}
+          muxPlaybackId={currentPuzzle.muxPlaybackId}
           links={currentPuzzle.links}
           isMultiplayer={isMultiplayer}
           waitingForOtherPlayer={waitingForOtherPlayer}
