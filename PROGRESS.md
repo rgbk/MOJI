@@ -1,6 +1,6 @@
 # Multiplayer Implementation Progress
 
-## ✅ Completed (Latest: December 2024)
+## ✅ Completed (Latest: January 2025)
 
 ### Complete Supabase Data Migration 🎉
 - **Settings Service**: All game settings now stored in `game_settings` table
@@ -42,12 +42,24 @@
 - **Mux streaming** - HLS video streaming with MP4 fallback
 - **Auto thumbnails** - Generated from Mux API
 - **Background videos** - Full-screen video backgrounds during answer reveal
+- **HLS.js Integration** - Cross-browser HLS video support with automatic fallback
+- **Audio Enabled** - Videos now play with sound during answer reveal
 
 ### Admin System
 - **Live puzzle editing** - Changes save to Supabase instantly
 - **UI copy management** - Edit all game text through admin panel
 - **Settings control** - Game timing, scoring, and behavior settings
 - **Import/Export** - Backup and restore functionality
+
+### 🆕 Latest Fixes (January 2025)
+- **Server-Synchronized Timers** - Perfect timer sync across all players using database timestamps
+- **Real-time Subscription Fix** - Resolved critical bug where Player 2 couldn't receive game updates
+- **SessionStorage Fix** - Room creator detection now works properly for Player 1/2 identification
+- **React Render Fix** - Fixed navigation-during-render bug that broke subscription lifecycle
+- **Act Locally, Sync Globally** - Optimized multiplayer UX with immediate local updates + server sync
+- **Cross-Browser Video** - HLS.js ensures video works in Chrome, Firefox, Safari with audio
+- **Database Schema** - Added `round_started_at` timestamp field for authoritative timer sync
+- **Channel Conflicts Fixed** - Unique subscription channel names prevent player interference
 
 ## 🚧 Current Status: PRODUCTION READY ✅
 
@@ -82,17 +94,21 @@ The multiplayer system is fully functional with:
 
 ## 🎯 Recent Achievements (This Session)
 
-- **Complete localStorage elimination** - All data now in Supabase
-- **Mux video integration** - Professional video streaming 
-- **Admin real-time updates** - Edit game content live
-- **Performance optimization** - Async loading with defaults
-- **Mobile compatibility** - Full ngrok HTTPS testing setup
+- **Multiplayer Timer Synchronization** - Server-authoritative timers using database timestamps
+- **Real-time Subscription Debugging** - Fixed critical Player 2 update reception issues  
+- **HLS.js Video Integration** - Cross-browser video streaming with audio enabled
+- **React Lifecycle Fixes** - Resolved navigation-during-render breaking subscriptions
+- **Database Schema Updates** - Added round_started_at for perfect timer sync
+- **SessionStorage Debugging** - Fixed room creator detection for proper Player 1/2 roles
+- **Production-Ready Multiplayer** - Both players now have identical, synchronized gameplay
 
 ## 🐛 Known Issues
 
 - **Minor**: Admin puzzle editor needs Mux upload UI
-- **Minor**: Some redundant video fields in admin forms
+- **Minor**: Some redundant video fields in admin forms  
 - **Enhancement**: Could add bulk puzzle import/export
+- **Enhancement**: Video autoplay may be blocked by browser policies (user interaction required)
+- **Minor**: Excessive debug logging can be cleaned up for production
 
 ## 🏆 Success Metrics Achieved
 

@@ -23,6 +23,7 @@
     "boring-avatars": "^2.0.1",
     "canvas-confetti": "^1.9.3",
     "clsx": "^2.1.1",
+    "hls.js": "^1.6.11",
     "openai": "^5.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

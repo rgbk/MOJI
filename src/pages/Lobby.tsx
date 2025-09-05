@@ -50,6 +50,18 @@ function Lobby() {
     }
   }, [roomId])
 
+  // Handle automatic navigation for approved Player 2
+  useEffect(() => {
+    const myPlayer = players.find(p => !p.is_creator)
+    if (myPlayer?.approved && !isCreator) {
+      // Navigate after a short delay to ensure state is stable
+      const timer = setTimeout(() => {
+        navigate(`/game/${roomId}`)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [players, isCreator, navigate, roomId])
+
   const loadRoomData = async () => {
     try {
       setLoading(true)
@@ -255,8 +267,6 @@ function Lobby() {
       {(() => {
         const myPlayer = players.find(p => !p.is_creator)
         if (myPlayer?.approved) {
-          // If approved, automatically go to game
-          navigate(`/game/${roomId}`)
           return (
             <div>
               <p className="text-xl text-green-400 mb-4">✅ Starting game...</p>

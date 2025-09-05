@@ -27,6 +27,9 @@ function Home() {
       await debugSupabase()
       
       const room = await roomService.createRoom()
+      // Mark this browser as the room creator
+      sessionStorage.setItem(`room-creator-${room.id}`, 'true')
+      console.log('✅ Room created, marked as creator:', room.id)
       navigate(`/room/${room.id}`)
     } catch (err) {
       console.error('❌ Room creation failed:', err)

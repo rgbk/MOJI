@@ -54,14 +54,12 @@ function GameScreen({ gameId }: GameScreenProps) {
   useEffect(() => {
     const loadPuzzles = async () => {
       try {
-        console.log('🔄 GameScreen: Loading puzzles...')
         
         // Check if this is a multiplayer game with a room
         const roomDataResult = await roomService.getRoomById(gameId)
         
         if (roomDataResult?.puzzle_sequence) {
           // Multiplayer game - use the room's puzzle sequence
-          console.log('🎮 GameScreen: Loading multiplayer puzzle sequence:', roomDataResult.puzzle_sequence)
           setIsMultiplayer(true)
           setRoomData(roomDataResult)
           setCurrentPuzzleIndex(roomDataResult.current_puzzle_index || 0)
@@ -69,7 +67,9 @@ function GameScreen({ gameId }: GameScreenProps) {
           setPlayer2Score(roomDataResult.player2_score || 0)
           
           // Determine if this is player 1 (room creator)
-          const isCreator = sessionStorage.getItem(`room-creator-${gameId}`) === 'true'
+          const sessionKey = `room-creator-${gameId}`
+          const sessionValue = sessionStorage.getItem(sessionKey)
+          const isCreator = sessionValue === 'true'
           setIsPlayer1(isCreator)
           
           const allPuzzles = await puzzleService.getPuzzles()
@@ -77,41 +77,45 @@ function GameScreen({ gameId }: GameScreenProps) {
             allPuzzles.find(p => p.id === id)
           ).filter(p => p !== undefined) as Puzzle[]
           
-          console.log(`✅ GameScreen: Loaded ${gamePuzzles.length} synced puzzles for multiplayer`)
           setPuzzles(gamePuzzles)
           
           // Set up real-time subscription for multiplayer updates
+          console.log('🔗 SETTING UP SUBSCRIPTION - Player', isPlayer1 ? '1' : '2', 'gameId:', gameId)
           const subscription = supabase
-            .channel(`game-${gameId}`)
+            .channel(`room_${gameId}_${Math.random()}`) // Unique channel name
             .on(
               'postgres_changes',
               {
-                event: 'UPDATE',
+                event: '*', // Listen to all events
                 schema: 'public',
                 table: 'game_rooms',
                 filter: `id=eq.${gameId}`
               },
               (payload) => {
-                console.log('🔄 Real-time game update:', payload.new)
-                const updated = payload.new as GameRoom
-                setRoomData(updated)
-                setCurrentPuzzleIndex(updated.current_puzzle_index || 0)
-                setPlayer1Score(updated.player1_score || 0)
-                setPlayer2Score(updated.player2_score || 0)
-                
-                // Handle game state changes
-                if (updated.game_state === 'showing_answer') {
-                  setShowAnswerReveal(true)
-                  setRoundWinner(updated.round_winner as 'player1' | 'player2' || null)
-                  setLastAnswerCorrect(!!updated.round_winner)
-                } else if (updated.game_state === 'playing') {
-                  setShowAnswerReveal(false)
-                  setWaitingForOtherPlayer(false)
-                  setTimeLeft(roundTimer)
+                console.log('🚨 REAL-TIME RECEIVED:', payload.eventType, payload.new?.game_state, 'Player:', isPlayer1 ? '1' : '2')
+                if (payload.eventType === 'UPDATE') {
+                  const updated = payload.new as GameRoom
+                  setRoomData(updated)
+                  setCurrentPuzzleIndex(updated.current_puzzle_index || 0)
+                  setPlayer1Score(updated.player1_score || 0)
+                  setPlayer2Score(updated.player2_score || 0)
+                  
+                  if (updated.game_state === 'showing_answer') {
+                    setShowAnswerReveal(true)
+                    const winner = updated.round_winner as 'player1' | 'player2' || null
+                    setRoundWinner(winner)
+                    const thisPlayerWon = winner === (isPlayer1 ? 'player1' : 'player2')
+                    setLastAnswerCorrect(thisPlayerWon)
+                  } else if (updated.game_state === 'playing') {
+                    setShowAnswerReveal(false)
+                    setWaitingForOtherPlayer(false)
+                  }
                 }
               }
             )
-            .subscribe()
+            .subscribe((status) => {
+              console.log('📡 Subscription status - Player', isPlayer1 ? '1' : '2', ':', status)
+            })
             
           // Cleanup subscription on unmount
           return () => {
@@ -119,12 +123,10 @@ function GameScreen({ gameId }: GameScreenProps) {
           }
         } else {
           // Single player or fallback - generate random puzzles
-          console.log('👤 GameScreen: Single player mode - generating random puzzles')
           const puzzleData = await puzzleService.getPuzzles()
           const shuffledPuzzles = shuffleArray(puzzleData)
           const gamePuzzles = shuffledPuzzles.slice(0, puzzlesPerGame)
           
-          console.log(`🎲 GameScreen: Selected ${gamePuzzles.length} random puzzles`)
           setPuzzles(gamePuzzles)
         }
         
@@ -139,27 +141,59 @@ function GameScreen({ gameId }: GameScreenProps) {
 
   const currentPuzzle = puzzles[currentPuzzleIndex]
 
-  // Timer countdown effect
+  // Shared timestamp-based timer effect
   useEffect(() => {
-    if (timeLeft > 0 && currentPuzzle) {
+    if (!currentPuzzle) return
+    
+    // For multiplayer, use shared timestamp
+    if (isMultiplayer && roomData?.round_started_at) {
+      const updateTimer = () => {
+        const startTime = new Date(roomData.round_started_at!).getTime()
+        const currentTime = new Date().getTime()
+        const elapsed = Math.floor((currentTime - startTime) / 1000)
+        const remaining = Math.max(0, roundTimer - elapsed)
+        
+        setTimeLeft(remaining)
+        
+        // Auto-expire when time runs out (only log once)
+        if (remaining === 0 && roomData.game_state === 'playing') {
+          handleTimeUp()
+        }
+      }
+
+      // Update immediately and then every second
+      updateTimer()
+      const timer = setInterval(updateTimer, 1000)
+      
+      return () => clearInterval(timer)
+    } 
+    // For single player, use traditional countdown
+    else if (!isMultiplayer && timeLeft > 0) {
       const timer = setInterval(() => {
-        setTimeLeft(prev => prev - 1)
+        setTimeLeft(prev => {
+          const newTime = prev - 1
+          if (newTime === 0) {
+            handleTimeUp()
+          }
+          return newTime
+        })
       }, 1000)
       return () => clearInterval(timer)
-    } else if (timeLeft === 0 && currentPuzzle) {
-      // Time's up - move to next puzzle
-      handleTimeUp()
     }
-  }, [timeLeft, currentPuzzle])
+  }, [currentPuzzle, roomData?.round_started_at, roomData?.game_state, roundTimer, isMultiplayer, timeLeft])
 
   const handleTimeUp = async () => {
     if (isMultiplayer && roomData) {
-      // Multiplayer: Update room state for all players to see
-      await roomService.updateGameState(gameId, {
-        game_state: 'showing_answer',
-        round_winner: undefined,
-        players_ready_for_next: []
-      })
+      // Only trigger if still in playing state (prevent duplicate calls)
+      if (roomData.game_state === 'playing') {
+        // Let real-time subscription handle UI updates
+        
+        await roomService.updateGameState(gameId, {
+          game_state: 'showing_answer',
+          round_winner: undefined,
+          players_ready_for_next: []
+        })
+      }
     } else {
       // Single player: Handle locally
       setLastAnswerCorrect(false)
@@ -191,7 +225,6 @@ function GameScreen({ gameId }: GameScreenProps) {
         setCurrentPuzzleIndex(prev => prev + 1)
         setTimeLeft(roundTimer)
       } else {
-        console.log('Game completed!')
       }
     }
   }
@@ -210,6 +243,8 @@ function GameScreen({ gameId }: GameScreenProps) {
         const currentScore = isPlayer1 ? player1Score : player2Score
         const newScore = currentScore + 1
         
+        // Let real-time subscription handle UI updates
+        
         await roomService.updateGameState(gameId, {
           game_state: 'showing_answer',
           round_winner: winnerKey,
@@ -219,7 +254,6 @@ function GameScreen({ gameId }: GameScreenProps) {
         
         // Check win condition
         if (newScore >= winCondition) {
-          console.log(`${winnerKey} wins the game!`, { score: newScore, winCondition })
           // TODO: Show game over screen
         }
       } else {
@@ -232,7 +266,6 @@ function GameScreen({ gameId }: GameScreenProps) {
         
         // Check win condition
         if (newScore >= winCondition) {
-          console.log('Player 1 wins the game!', { score: newScore, winCondition })
           // TODO: Show game over screen
         }
       }
@@ -271,7 +304,6 @@ function GameScreen({ gameId }: GameScreenProps) {
 
   // Don't render until puzzles are loaded
   if (!currentPuzzle) {
-    console.log('🔍 GameScreen Debug:', { puzzles: puzzles.length, currentPuzzleIndex, currentPuzzle, loadingError })
     return (
       <div className="fixed inset-0 bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
@@ -339,17 +371,18 @@ function GameScreen({ gameId }: GameScreenProps) {
       {/* Answer Reveal Modal */}
       {showAnswerReveal && (
         <AnswerReveal
-          answer={currentPuzzle.displayAnswer}
-          isCorrect={lastAnswerCorrect}
-          playerWon={roundWinner}
-          onNext={handleNextRound}
-          videoUrl={getVideoUrl(currentPuzzle.videoFile) || undefined}
-          muxPlaybackId={currentPuzzle.muxPlaybackId}
-          links={currentPuzzle.links}
-          isMultiplayer={isMultiplayer}
-          waitingForOtherPlayer={waitingForOtherPlayer}
-          isPlayer1={isPlayer1}
-        />
+              answer={currentPuzzle.displayAnswer}
+              isCorrect={lastAnswerCorrect}
+              playerWon={roundWinner}
+              onNext={handleNextRound}
+              showVideo={true}
+              videoUrl={getVideoUrl(currentPuzzle.videoFile) || undefined}
+              muxPlaybackId={currentPuzzle.muxPlaybackId}
+              links={currentPuzzle.links}
+              isMultiplayer={isMultiplayer}
+              waitingForOtherPlayer={waitingForOtherPlayer}
+              isPlayer1={isPlayer1}
+            />
       )}
     </div>
   )

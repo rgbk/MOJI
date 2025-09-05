@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import confetti from 'canvas-confetti'
+import Hls from 'hls.js'
 import { cn } from '../lib/utils'
 import { uiCopyService } from '../lib/uiCopy'
 
@@ -32,7 +33,72 @@ function AnswerReveal({
 }: AnswerRevealProps) {
   const confettiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasPlayedConfetti = useRef(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const hlsRef = useRef<Hls | null>(null)
   
+  // HLS setup effect
+  useEffect(() => {
+    if (showVideo && muxPlaybackId && videoRef.current) {
+      const video = videoRef.current
+      const hlsUrl = `https://stream.mux.com/${muxPlaybackId}.m3u8`
+      
+      console.log('🎥 Setting up HLS for:', hlsUrl)
+      
+      if (Hls.isSupported()) {
+        // Use HLS.js for browsers without native HLS support
+        console.log('🎥 Using HLS.js')
+        const hls = new Hls({
+          debug: false,
+          enableWorker: true
+        })
+        
+        hls.loadSource(hlsUrl)
+        hls.attachMedia(video)
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('🎥 HLS manifest parsed, starting playback')
+          video.play().catch(e => console.log('🎥 Autoplay blocked:', e))
+        })
+        
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('🎥 HLS error:', data)
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.log('🎥 Fatal network error, trying to recover')
+                hls.startLoad()
+                break
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.log('🎥 Fatal media error, trying to recover')
+                hls.recoverMediaError()
+                break
+              default:
+                console.log('🎥 Fatal error, destroying HLS instance')
+                hls.destroy()
+                break
+            }
+          }
+        })
+        
+        hlsRef.current = hls
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS support (Safari)
+        console.log('🎥 Using native HLS')
+        video.src = hlsUrl
+        video.play().catch(e => console.log('🎥 Autoplay blocked:', e))
+      }
+    }
+    
+    return () => {
+      if (hlsRef.current) {
+        console.log('🎥 Cleaning up HLS instance')
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
+    }
+  }, [showVideo, muxPlaybackId])
+
+  // Confetti effect
   useEffect(() => {
     if (isCorrect && playerWon && !hasPlayedConfetti.current) {
       hasPlayedConfetti.current = true
@@ -147,40 +213,46 @@ function AnswerReveal({
       </div>
 
       {/* Video background (if enabled) */}
-      {showVideo && (muxPlaybackId || videoUrl) && (
-        <div className="fixed inset-0 -z-10">
-          {muxPlaybackId ? (
-            // Use Mux video player
-            <video
-              autoPlay
-              muted
-              loop
-              className="w-full h-full object-cover"
-              poster={`https://image.mux.com/${muxPlaybackId}/thumbnail.jpg?width=1920&height=1080&fit_mode=pad`}
-            >
-              <source 
-                src={`https://stream.mux.com/${muxPlaybackId}.m3u8`} 
-                type="application/x-mpegURL" 
+      {(() => {
+        console.log('🎥 AnswerReveal video render check:', {
+          showVideo,
+          muxPlaybackId,
+          videoUrl,
+          shouldShowVideo: showVideo && (muxPlaybackId || videoUrl)
+        })
+        return showVideo && (muxPlaybackId || videoUrl) && (
+          <div className="fixed inset-0 -z-10">
+            {muxPlaybackId ? (
+              // Use HLS.js for Mux video
+              <video
+                ref={videoRef}
+                autoPlay
+                loop
+                playsInline
+                className="w-full h-full object-cover"
+                poster={`https://image.mux.com/${muxPlaybackId}/thumbnail.jpg?width=1920&height=1080&fit_mode=pad`}
+                onLoadStart={() => console.log('🎥 Video element loading started')}
+                onCanPlay={() => console.log('🎥 Video can play')}
+                onError={(e) => console.error('🎥 Video error:', e)}
               />
-              <source 
-                src={`https://stream.mux.com/${muxPlaybackId}/high.mp4`} 
-                type="video/mp4" 
-              />
-            </video>
-          ) : (
-            // Fallback to regular video URL
-            <video
-              autoPlay
-              muted
-              loop
-              className="w-full h-full object-cover"
-            >
-              <source src={videoUrl} type="video/mp4" />
-            </video>
-          )}
-          <div className="absolute inset-0 bg-black/60" />
-        </div>
-      )}
+            ) : videoUrl ? (
+              // Fallback to regular video URL
+              <video
+                autoPlay
+                loop
+                playsInline
+                className="w-full h-full object-cover"
+                onLoadStart={() => console.log('🎥 Regular video loading started')}
+                onCanPlay={() => console.log('🎥 Regular video can play')}
+                onError={(e) => console.error('🎥 Regular video error:', e)}
+              >
+                <source src={videoUrl} type="video/mp4" />
+              </video>
+            ) : null}
+            <div className="absolute inset-0 bg-black/60" />
+          </div>
+        )
+      })()}
     </div>
   )
 }

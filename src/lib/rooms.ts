@@ -13,6 +13,7 @@ export interface GameRoom {
   player1_score?: number
   player2_score?: number
   players_ready_for_next?: string[]
+  round_started_at?: string
 }
 
 export interface RoomPlayer {
@@ -129,7 +130,8 @@ export const roomService = {
         game_state: 'playing',
         player1_score: 0,
         player2_score: 0,
-        players_ready_for_next: []
+        players_ready_for_next: [],
+        round_started_at: new Date().toISOString()
       })
       .eq('id', roomId)
 
@@ -169,6 +171,7 @@ export const roomService = {
         updates.game_state = 'playing'
         updates.players_ready_for_next = []
         updates.round_winner = undefined
+        updates.round_started_at = new Date().toISOString()
       }
 
       await this.updateGameState(roomId, updates)
