@@ -45,6 +45,8 @@ export default defineConfig({
       '.ngrok-free.app', // Allow any ngrok-free.app subdomain
       '.ngrok.io', // Allow any ngrok.io subdomain
       '.ngrok.app', // Allow any ngrok.app subdomain
+      '.loca.lt', // Allow LocalTunnel domains
+      '.trycloudflare.com', // Allow Cloudflare tunnel domains
     ],
   },
   build: {

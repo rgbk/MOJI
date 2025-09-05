@@ -60,6 +60,11 @@ function Lobby() {
     if (myPlayer?.approved && !isCreator) {
       // Navigate after a short delay to ensure state is stable
       const timer = setTimeout(() => {
+        console.log('🦁 Safari Navigation Debug: Lobby → Game', { 
+          roomId, 
+          sessionKey: `moji-mic-permission-${roomId}`,
+          sessionValue: sessionStorage.getItem(`moji-mic-permission-${roomId}`)
+        })
         navigate(`/game/${roomId}`)
       }, 100)
       return () => clearTimeout(timer)
@@ -335,7 +340,7 @@ function Lobby() {
             roomCreator: sessionStorage.getItem(`room-creator-${roomId}`)
           },
           localStorage: {
-            micPermission: localStorage.getItem('moji-mic-permission')
+            micPermission: roomId ? sessionStorage.getItem(`moji-mic-permission-${roomId}`) : null
           },
           microphone: microphoneDebugInfo || 'loading...'
         }}

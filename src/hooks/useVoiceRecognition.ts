@@ -59,6 +59,7 @@ export function useVoiceRecognition(
   options: UseVoiceRecognitionOptions = {},
   roomId?: string
 ): UseVoiceRecognitionReturn {
+  const hookId = Math.random().toString(36).substr(2, 9) // Generate unique ID for debugging
   const {
     language = 'en-US',
     continuous = false,
@@ -73,16 +74,61 @@ export function useVoiceRecognition(
   const [confidence, setConfidence] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSupported, setIsSupported] = useState(false)
-  // Initialize permission state from room-specific sessionStorage if available
+  // Initialize permission state from localStorage for Safari, sessionStorage for others
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(() => {
     if (roomId) {
-      const sessionKey = `moji-mic-permission-${roomId}`
-      const saved = sessionStorage.getItem(sessionKey)
-      console.log('🎤 Initializing permission from sessionStorage:', { roomId, saved })
+      const storageKey = `moji-mic-permission-${roomId}`
+      // Safari loses sessionStorage on navigation, so use localStorage
+      const storage = BROWSER_INFO.isSafari ? localStorage : sessionStorage
+      const saved = storage.getItem(storageKey)
+      console.log('🎤 Initializing permission from storage:', { hookId, roomId, saved, usedLocalStorage: BROWSER_INFO.isSafari })
       return saved === 'granted' ? true : null
     }
     return null
   })
+
+  // Add effect to listen for permission changes in sessionStorage from other hook instances
+  useEffect(() => {
+    if (!roomId) return
+
+    const sessionKey = `moji-mic-permission-${roomId}`
+    
+    // Create a custom event for cross-tab/cross-component permission sync
+    const handlePermissionSync = (event: CustomEvent) => {
+      if (event.detail.roomId === roomId) {
+        const isGranted = event.detail.granted
+        console.log('🎤 Syncing permission state from another component:', { hookId, roomId, granted: isGranted })
+        setPermissionGranted(isGranted)
+      }
+    }
+
+    // Listen for custom permission sync events
+    window.addEventListener('voicePermissionSync', handlePermissionSync as EventListener)
+
+    // Also check sessionStorage periodically to catch any missed updates
+    const syncInterval = setInterval(() => {
+      const currentPermission = sessionStorage.getItem(sessionKey)
+      const isCurrentlyGranted = currentPermission === 'granted'
+      const currentState = permissionGranted
+      
+      // Only update if the state has actually changed
+      if ((currentState === null && isCurrentlyGranted) || 
+          (currentState === true && !isCurrentlyGranted) ||
+          (currentState === false && isCurrentlyGranted)) {
+        console.log('🎤 Permission state changed in sessionStorage, syncing:', { 
+          roomId, 
+          from: currentState, 
+          to: isCurrentlyGranted 
+        })
+        setPermissionGranted(isCurrentlyGranted ? true : (currentPermission === null ? null : false))
+      }
+    }, 500) // Check every 500ms
+
+    return () => {
+      window.removeEventListener('voicePermissionSync', handlePermissionSync as EventListener)
+      clearInterval(syncInterval)
+    }
+  }, [roomId, permissionGranted])
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -332,6 +378,20 @@ export function useVoiceRecognition(
           const shouldUpdatePermissionStatus = ['not-allowed', 'service-not-allowed'].includes(event.error)
           if (shouldUpdatePermissionStatus) {
             setPermissionGranted(false)
+            
+            // Update sessionStorage and sync with other instances
+            if (roomId) {
+              const storageKey = `moji-mic-permission-${roomId}`
+      const storage = BROWSER_INFO.isSafari ? localStorage : sessionStorage
+              storage.removeItem(storageKey)
+              
+              // Dispatch custom event to sync with other hook instances
+              window.dispatchEvent(new CustomEvent('voicePermissionSync', {
+                detail: { roomId, granted: false }
+              }))
+              console.log('🎤 Dispatched permission error sync event:', { roomId, granted: false, error: event.error })
+            }
+            
             if (recognitionRef.current) {
               recognitionRef.current = null
             }
@@ -411,9 +471,16 @@ export function useVoiceRecognition(
       
       // Save permission to room-specific sessionStorage
       if (roomId) {
-        const sessionKey = `moji-mic-permission-${roomId}`
-        sessionStorage.setItem(sessionKey, 'granted')
+        const storageKey = `moji-mic-permission-${roomId}`
+      const storage = BROWSER_INFO.isSafari ? localStorage : sessionStorage
+        storage.setItem(storageKey, 'granted')
         console.log('🎤 Saved permission to sessionStorage for room:', roomId)
+        
+        // Dispatch custom event to sync with other hook instances
+        window.dispatchEvent(new CustomEvent('voicePermissionSync', {
+          detail: { roomId, granted: true }
+        }))
+        console.log('🎤 Dispatched permission sync event:', { roomId, granted: true })
       }
       
       console.log('🎤 Microphone permission granted by user')
@@ -428,9 +495,16 @@ export function useVoiceRecognition(
       
       // Clear permission from room-specific sessionStorage
       if (roomId) {
-        const sessionKey = `moji-mic-permission-${roomId}`
-        sessionStorage.removeItem(sessionKey)
+        const storageKey = `moji-mic-permission-${roomId}`
+      const storage = BROWSER_INFO.isSafari ? localStorage : sessionStorage
+        storage.removeItem(storageKey)
         console.log('🎤 Cleared permission from sessionStorage for room:', roomId)
+        
+        // Dispatch custom event to sync with other hook instances
+        window.dispatchEvent(new CustomEvent('voicePermissionSync', {
+          detail: { roomId, granted: false }
+        }))
+        console.log('🎤 Dispatched permission denied sync event:', { roomId, granted: false })
       }
       
       console.log('🎤 Microphone permission denied by user')

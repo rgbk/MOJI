@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
 import { HomeIcon } from '@heroicons/react/24/solid'
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition'
+import { BROWSER_INFO, checkSafariRequirements, detectBrowser } from '../utils/browserDetection'
 
 interface DebugOverlayProps {
   viewName?: string
@@ -14,6 +16,20 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [timestamp, setTimestamp] = useState(new Date().toLocaleTimeString())
   const [copySuccess, setCopySuccess] = useState(false)
+
+  // Add voice recognition debugging for Safari issues
+  const roomId = params.roomId
+  const voice = useVoiceRecognition({
+    language: 'en-US',
+    continuous: false,
+    interimResults: true,
+    confidenceThreshold: 0.0,
+    enableAudioFeedback: false // Don't play sounds in debug mode
+  }, roomId)
+  
+  // Get comprehensive browser and voice info
+  const browserInfo = detectBrowser()
+  const safariRequirements = BROWSER_INFO.isSafari ? checkSafariRequirements(BROWSER_INFO) : null
 
   // Update timestamp every second
   useEffect(() => {
@@ -55,14 +71,34 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
 
   const autoViewName = getDetailedViewName()
 
+  // Get the actual room/game ID from params
+  const actualRoomId = params.roomId || params.gameId
+  
+  // Get all mic permission keys from sessionStorage
+  const allMicPermissionKeys = Object.keys(sessionStorage)
+    .filter(key => key.includes('moji-mic-permission'))
+    .map(key => ({
+      key,
+      value: sessionStorage.getItem(key)
+    }))
+  
   // Get relevant info
   const debugInfo = {
     view: autoViewName,
     path: location.pathname,
-    params: Object.keys(params).length > 0 ? params : undefined,
-    search: location.search || undefined,
-    hash: location.hash || undefined,
+    
+    // CRITICAL SAFARI DEBUG
+    ...(BROWSER_INFO.isSafari ? {
+      '🦁 ROOM_ID': actualRoomId || 'none',
+      '🦁 SESSION_KEY': actualRoomId ? `moji-mic-permission-${actualRoomId}` : 'none',
+      '🦁 SESSION_VALUE': actualRoomId ? sessionStorage.getItem(`moji-mic-permission-${actualRoomId}`) : 'none',
+      '🦁 ALL_MIC_KEYS': allMicPermissionKeys.length > 0 ? allMicPermissionKeys : 'none',
+      '🦁 VOICE_PERMISSION': voice.permissionGranted,
+      '🦁 VOICE_ERROR': voice.error || 'none',
+    } : {}),
+    
     time: timestamp,
+    
     ...additionalInfo
   }
 
@@ -71,11 +107,20 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
     Object.entries(debugInfo).filter(([, value]) => value !== undefined)
   )
 
-  // Copy debug state to clipboard
+  // Copy debug state to clipboard with enhanced voice debugging
   const handleCopyState = async (e: React.MouseEvent) => {
     e.stopPropagation()
     
-    const stateString = `🐛 Debug State: ${autoViewName}\n` + 
+    const stateString = `🐛 MOJI Debug State: ${autoViewName}\n` +
+      `🕐 ${timestamp}\n` +
+      (BROWSER_INFO.isSafari ? `🦁 Safari Voice Issues Detected\n` : '') +
+      (voice.error ? `❌ Voice Error: ${voice.error}\n` : '') +
+      `\n📱 Voice Recognition Status:\n` +
+      Object.entries(filteredInfo)
+        .filter(([key]) => key.startsWith('voice') || key.startsWith('safari'))
+        .map(([key, value]) => `  ${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+        .join('\n') +
+      `\n\n📋 Full Debug Info:\n` +
       Object.entries(filteredInfo)
         .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
         .join('\n')
@@ -103,25 +148,35 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
       {/* Debug Overlay */}
       <div 
         className={`bg-black/90 text-green-400 rounded-lg border border-green-500/50 transition-all duration-200 ${
-          isExpanded ? 'p-3 min-w-[250px]' : 'px-2 py-1'
+          isExpanded ? 'p-3 min-w-[250px] max-w-[350px] max-h-[70vh] overflow-y-auto' : 'px-2 py-1'
         }`}
         onClick={() => setIsExpanded(!isExpanded)}
         style={{ cursor: 'pointer' }}
       >
         {!isExpanded ? (
-          // Compact view - just show view name
+          // Compact view - show view name and voice/Safari status
           <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <div className={`w-2 h-2 rounded-full ${
+              BROWSER_INFO.isSafari && voice.error ? 'bg-red-500 animate-pulse' : 
+              BROWSER_INFO.isSafari ? 'bg-yellow-500' :
+              'bg-green-400 animate-pulse'
+            }`}></div>
             <span className="font-bold">{autoViewName}</span>
+            {BROWSER_INFO.isSafari && voice.error && (
+              <span className="text-red-400 text-xs">🦁🎤❌</span>
+            )}
+            {BROWSER_INFO.isSafari && !voice.error && voice.permissionGranted === false && (
+              <span className="text-yellow-400 text-xs">🦁🎤⚠️</span>
+            )}
           </div>
         ) : (
           // Expanded view - show all debug info
           <div className="space-y-1">
-            <div className="flex justify-between items-center border-b border-green-500/30 pb-1 mb-2">
+            <div className="flex justify-between items-center border-b border-green-500/30 pb-1 mb-2 sticky top-0 bg-black/90">
               <span className="text-green-300 font-bold">🐛 Debug Info</span>
               <button
                 onClick={handleCopyState}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
+                className={`px-2 py-1 text-xs rounded transition-colors flex-shrink-0 ${
                   copySuccess 
                     ? 'bg-green-700 text-white' 
                     : 'bg-green-600 hover:bg-green-500 text-white'
