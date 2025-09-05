@@ -1,5 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { audioFeedback } from '../lib/audio'
+import { 
+  BROWSER_INFO, 
+  SAFARI_LIMITATIONS, 
+  getSafariErrorMessage, 
+  logSafariDebugInfo,
+  checkSafariRequirements 
+} from '../utils/browserDetection'
+import { 
+  voiceErrorRateLimiter, 
+  safariVoiceErrorRateLimiter, 
+  createRateLimitedErrorHandler,
+  getVoiceErrorKey 
+} from '../utils/errorRateLimit'
 
 // SpeechRecognition types are defined in src/types/speech.d.ts
 
@@ -43,7 +56,8 @@ export interface UseVoiceRecognitionReturn {
 }
 
 export function useVoiceRecognition(
-  options: UseVoiceRecognitionOptions = {}
+  options: UseVoiceRecognitionOptions = {},
+  roomId?: string
 ): UseVoiceRecognitionReturn {
   const {
     language = 'en-US',
@@ -59,23 +73,80 @@ export function useVoiceRecognition(
   const [confidence, setConfidence] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSupported, setIsSupported] = useState(false)
-  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null)
+  // Initialize permission state from room-specific sessionStorage if available
+  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(() => {
+    if (roomId) {
+      const sessionKey = `moji-mic-permission-${roomId}`
+      const saved = sessionStorage.getItem(sessionKey)
+      console.log('🎤 Initializing permission from sessionStorage:', { roomId, saved })
+      return saved === 'granted' ? true : null
+    }
+    return null
+  })
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isInitialized = useRef(false)
+  
+  // Safari-specific state
+  const safariDebugLogged = useRef(false)
+  const rateLimiter = BROWSER_INFO.isSafari ? safariVoiceErrorRateLimiter : voiceErrorRateLimiter
+  
+  // Helper function for base error messages
+  const getBaseErrorMessage = useCallback((error: string): string => {
+    switch (error) {
+      case 'not-allowed':
+        return 'Microphone access denied. Please click the microphone icon in your browser address bar and allow microphone access, then try again.'
+      case 'no-speech':
+        return 'No speech detected. Please try speaking clearly into your microphone.'
+      case 'audio-capture':
+        return 'Cannot access your microphone. Please check that your microphone is connected and not being used by another application.'
+      case 'network':
+        return 'Network error occurred during speech recognition. Please check your internet connection and try again.'
+      case 'service-not-allowed':
+        return 'Speech recognition service is not allowed. Please enable microphone permissions and ensure you are using HTTPS.'
+      case 'bad-grammar':
+        return 'Speech recognition configuration error. Please try again.'
+      case 'language-not-supported':
+        return 'The selected language is not supported for speech recognition.'
+      case 'aborted':
+        return 'Speech recognition was stopped.'
+      default:
+        return `Speech recognition error: ${error}. Please try again.`
+    }
+  }, [])
 
   // Check browser support and secure context on mount
   useEffect(() => {
+    console.log('🎤 useVoiceRecognition hook mounted/re-initialized')
+    
+    // Safari-specific debugging info (log once)
+    if (BROWSER_INFO.isSafari && !safariDebugLogged.current) {
+      logSafariDebugInfo()
+      safariDebugLogged.current = true
+    }
+    
+    // Check Safari requirements
+    if (BROWSER_INFO.isSafari) {
+      const requirements = checkSafariRequirements(BROWSER_INFO)
+      if (requirements.issues.length > 0) {
+        console.warn('🦁 Safari compatibility issues detected:', requirements.issues)
+      }
+    }
+    
     // Check if we're in a secure context (HTTPS or localhost)
     const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || 
       window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     
     if (!isSecureContext) {
+      const errorMsg = BROWSER_INFO.isSafari 
+        ? 'Safari requires HTTPS for microphone access. Please use https:// instead of http://'
+        : 'Microphone access requires a secure connection (HTTPS)'
+      
       console.error('🎤 Microphone access requires HTTPS or localhost')
       setIsSupported(false)
       setState('not-supported')
-      setError('Microphone access requires a secure connection (HTTPS)')
+      setError(errorMsg)
       return
     }
 
@@ -86,13 +157,21 @@ export function useVoiceRecognition(
       setIsSupported(true)
       setState('idle')
       
+      if (BROWSER_INFO.isSafari) {
+        console.log('🦁 Safari: Web Speech API is available')
+      }
+      
       // Check microphone permission status more robustly
       checkMicrophonePermission()
     } else {
+      const errorMsg = BROWSER_INFO.isSafari 
+        ? 'Web Speech API is not available in this version of Safari. Please update to a newer version or try Chrome.'
+        : 'Speech recognition is not supported in this browser'
+      
       console.warn('🎤 Speech Recognition not supported in this browser')
       setIsSupported(false)
       setState('not-supported')
-      setError('Speech recognition is not supported in this browser')
+      setError(errorMsg)
     }
   }, [])
 
@@ -211,75 +290,77 @@ export function useVoiceRecognition(
       }
     }
 
-    // Handle errors with enhanced messaging
+    // Handle errors with enhanced messaging and Safari-specific handling
     recognition.onerror = (event: any) => {
-      console.error('🎤 Voice recognition error:', { 
-        error: event.error, 
-        message: event.message,
-        timestamp: new Date().toISOString()
-      })
-      setState('error')
+      const errorKey = getVoiceErrorKey(event.error)
+      const logPrefix = BROWSER_INFO.isSafari ? '🦁 Safari voice error:' : '🎤 Voice recognition error:'
       
-      let errorMessage = 'Speech recognition error'
-      let shouldUpdatePermissionStatus = false
-      
-      switch (event.error) {
-        case 'not-allowed':
-          errorMessage = 'Microphone access denied. Please click the microphone icon in your browser address bar and allow microphone access, then try again.'
-          setPermissionGranted(false)
-          shouldUpdatePermissionStatus = true
-          break
-        case 'no-speech':
-          errorMessage = 'No speech detected. Please try speaking clearly into your microphone.'
-          // Don't change permission status for no-speech
-          break
-        case 'audio-capture':
-          errorMessage = 'Cannot access your microphone. Please check that your microphone is connected and not being used by another application.'
-          break
-        case 'network':
-          errorMessage = 'Network error occurred during speech recognition. Please check your internet connection and try again.'
-          break
-        case 'aborted':
-          errorMessage = 'Speech recognition was stopped.'
-          // Don't show error for user-initiated aborts
-          setState('idle')
-          setError(null)
-          return
-        case 'service-not-allowed':
-          errorMessage = 'Speech recognition service is not allowed. Please enable microphone permissions and ensure you are using HTTPS.'
-          setPermissionGranted(false)
-          shouldUpdatePermissionStatus = true
-          break
-        case 'bad-grammar':
-          errorMessage = 'Speech recognition configuration error. Please try again.'
-          break
-        case 'language-not-supported':
-          errorMessage = 'The selected language is not supported for speech recognition.'
-          break
-        default:
-          errorMessage = `Speech recognition error: ${event.error}. Please try again.`
-      }
-      
-      setError(errorMessage)
-      
-      // Reset recognition instance if we got a permission error
-      if (shouldUpdatePermissionStatus && recognitionRef.current) {
-        recognitionRef.current = null
-      }
-      
-      // Play error sound (only for actual errors, not aborts)
-      if (enableAudioFeedback && event.error !== 'aborted') {
-        try {
-          audioFeedback.playErrorSound()
-        } catch (audioError) {
-          console.warn('🎤 Failed to play error sound:', audioError)
+      // Use rate limiter to prevent error spam
+      const rateLimitedHandler = createRateLimitedErrorHandler(
+        rateLimiter,
+        (errorMessage: string, count: number) => {
+          // This will be called if the error should be processed
+          console.error(logPrefix, { 
+            error: event.error, 
+            message: event.message,
+            timestamp: new Date().toISOString(),
+            errorCount: count
+          })
+          
+          // Handle aborted errors differently (don't set error state)
+          if (event.error === 'aborted') {
+            setState('idle')
+            setError(null)
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current)
+              timeoutRef.current = null
+            }
+            return
+          }
+          
+          setState('error')
+          
+          // Get Safari-specific error message if applicable
+          const baseErrorMessage = getBaseErrorMessage(event.error)
+          const finalErrorMessage = BROWSER_INFO.isSafari 
+            ? getSafariErrorMessage(event.error, BROWSER_INFO)
+            : baseErrorMessage
+          
+          setError(finalErrorMessage)
+          
+          // Handle permission status updates
+          const shouldUpdatePermissionStatus = ['not-allowed', 'service-not-allowed'].includes(event.error)
+          if (shouldUpdatePermissionStatus) {
+            setPermissionGranted(false)
+            if (recognitionRef.current) {
+              recognitionRef.current = null
+            }
+          }
+          
+          // Play error sound (only for actual errors, not aborts)
+          if (enableAudioFeedback && event.error !== 'aborted') {
+            try {
+              audioFeedback.playErrorSound()
+            } catch (audioError) {
+              console.warn(logPrefix.replace('error:', 'Failed to play error sound:'), audioError)
+            }
+          }
+          
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+            timeoutRef.current = null
+          }
+        },
+        (errorKey: string, cooldownMs: number) => {
+          // This will be called if the error is rate limited
+          if (BROWSER_INFO.isSafari) {
+            console.warn(`🦁 Safari: Error "${errorKey}" rate limited (${Math.round(cooldownMs/1000)}s remaining)`)
+          }
         }
-      }
+      )
       
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
+      // Process the error through rate limiter
+      rateLimitedHandler(errorKey, event.error)
     }
 
     return recognition
@@ -327,6 +408,16 @@ export function useVoiceRecognition(
       setPermissionGranted(true)
       setError(null)
       setState('idle')
+      
+      // Save permission to room-specific sessionStorage
+      if (roomId) {
+        const sessionKey = `moji-mic-permission-${roomId}`
+        sessionStorage.setItem(sessionKey, 'granted')
+        console.log('🎤 Saved permission to sessionStorage for room:', roomId)
+      }
+      
+      console.log('🎤 Microphone permission granted by user')
+      
       console.log('🎤 Microphone permission granted successfully')
       return true
       
@@ -334,6 +425,15 @@ export function useVoiceRecognition(
       console.error('🎤 Microphone permission error:', err)
       setPermissionGranted(false)
       setState('error')
+      
+      // Clear permission from room-specific sessionStorage
+      if (roomId) {
+        const sessionKey = `moji-mic-permission-${roomId}`
+        sessionStorage.removeItem(sessionKey)
+        console.log('🎤 Cleared permission from sessionStorage for room:', roomId)
+      }
+      
+      console.log('🎤 Microphone permission denied by user')
       
       // Provide specific error messages based on error type
       let errorMessage = 'Unable to access microphone'
@@ -484,18 +584,39 @@ export function useVoiceRecognition(
   const checkMicrophonePermission = useCallback(async () => {
     if (!isSupported) return
     
+    // Don't re-check if we already have a granted permission
+    if (permissionGranted === true) {
+      console.log('🎤 Permission already granted, skipping re-check')
+      return
+    }
+    
     try {
       // Try using Permissions API first (more reliable for status checking)
       if (navigator.permissions && navigator.permissions.query) {
         const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
-        setPermissionGranted(permissionStatus.state === 'granted')
-        console.log('🎤 Microphone permission status:', permissionStatus.state)
+        const isGranted = permissionStatus.state === 'granted'
+        
+        console.log('🎤 Browser permission check:', {
+          state: permissionStatus.state,
+          granted: isGranted,
+          currentState: permissionGranted,
+          browser: BROWSER_INFO.isSafari ? 'Safari' : 'Other'
+        })
+        
+        // Only update state if it's different from current state
+        if (permissionGranted !== isGranted) {
+          console.log('🎤 Permission state changed:', { from: permissionGranted, to: isGranted })
+          setPermissionGranted(isGranted)
+        }
         
         // Listen for permission changes
         permissionStatus.onchange = () => {
           const newState = permissionStatus.state === 'granted'
           setPermissionGranted(newState)
-          console.log('🎤 Microphone permission changed:', permissionStatus.state)
+          console.log('🎤 Microphone permission changed:', {
+            state: permissionStatus.state,
+            granted: newState
+          })
           
           // Clear errors if permission was granted
           if (newState) {
@@ -504,14 +625,20 @@ export function useVoiceRecognition(
           }
         }
       } else {
-        console.log('🎤 Permissions API not available, will check on first use')
-        setPermissionGranted(null)
+        console.log('🎤 Permissions API not available, preserving current state')
+        // Don't change permission state if API is not available
+        if (permissionGranted !== true) {
+          setPermissionGranted(null)
+        }
       }
     } catch (err) {
       console.warn('🎤 Cannot check microphone permission:', err)
-      setPermissionGranted(null)
+      // Don't reset to null if we already have permission
+      if (permissionGranted !== true) {
+        setPermissionGranted(null)
+      }
     }
-  }, [isSupported])
+  }, [isSupported, permissionGranted])
 
   return {
     state,

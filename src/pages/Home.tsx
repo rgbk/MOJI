@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { roomService } from '../lib/rooms'
 import { debugSupabase } from '../lib/debug'
 import { uiCopyService } from '../lib/uiCopy'
+import DebugOverlay from '../components/DebugOverlay'
 
 function Home() {
   const navigate = useNavigate()
@@ -65,6 +66,15 @@ function Home() {
       >
         {creating ? 'CREATING ROOM...' : (uiCopyLoaded ? uiCopyService.getValue('home.button.start') : 'START NEW GAME')}
       </button>
+      
+      <DebugOverlay 
+        viewName="Home"
+        additionalInfo={{
+          creating,
+          uiCopyLoaded,
+          errorState: error ? 'has-error' : 'no-error'
+        }}
+      />
     </div>
   )
 }

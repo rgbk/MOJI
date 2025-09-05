@@ -5,6 +5,7 @@ import { testClaudeAPI } from '../lib/testClaude';
 import SettingsTab from '../components/SettingsTab';
 import UICopyTab from '../components/UICopyTab';
 import { puzzleService, type Puzzle } from '../lib/puzzles';
+import DebugOverlay from '../components/DebugOverlay';
 
 // Emoji categories for the picker
 const EMOJI_CATEGORIES = {
@@ -654,6 +655,17 @@ export default function Admin() {
           </div>
         </div>
       )}
+      
+      <DebugOverlay 
+        viewName="Admin"
+        additionalInfo={{
+          currentTab: activeTab,
+          puzzlesCount: puzzles.length,
+          selectedPuzzle: selectedPuzzle?.id || 'none',
+          showEmojiPicker,
+          isEditing: !!editingId
+        }}
+      />
     </div>
   );
 }

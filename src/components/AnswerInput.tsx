@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition'
 import { MicrophoneIcon } from '@heroicons/react/24/solid'
+import { BROWSER_INFO, getSafariErrorMessage } from '../utils/browserDetection'
+import { audioFeedback } from '../lib/audio'
 
 interface AnswerInputProps {
   value: string
@@ -21,10 +24,11 @@ function AnswerInput({
   placeholder = "Type your answer...",
   disabled = false 
 }: AnswerInputProps) {
+  const { roomId } = useParams()
   const [isPushToTalkHeld, setIsPushToTalkHeld] = useState(false)
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false)
 
-  // Initialize voice recognition for Push-to-Talk
+  // Initialize voice recognition for Push-to-Talk with room-specific persistence
   const {
     state: voiceState,
     transcript,
@@ -43,7 +47,7 @@ function AnswerInput({
     interimResults: true,
     confidenceThreshold: 0.0, // Accept all confidence levels
     enableAudioFeedback: true
-  })
+  }, roomId)
 
   // Always sync transcript to input field for Push-to-Talk
   useEffect(() => {
@@ -101,35 +105,47 @@ function AnswerInput({
   const handlePushToTalkStart = async () => {
     if (!voiceSupported || disabled) return
     
-    console.log('🎮 Push-to-Talk start requested', { 
+    const logPrefix = BROWSER_INFO.isSafari ? '🦁 Safari Push-to-Talk start:' : '🎮 Push-to-Talk start requested'
+    console.log(logPrefix, { 
       voiceSupported, 
       disabled, 
       permissionGranted,
-      voiceState 
+      voiceState,
+      isSafari: BROWSER_INFO.isSafari
     })
+    
+    // Mark user gesture for Safari AudioContext
+    if (BROWSER_INFO.isSafari) {
+      audioFeedback.markUserGesture()
+    }
     
     // If permission not granted, request it first
     if (permissionGranted === false || permissionGranted === null) {
-      console.log('🎮 Requesting microphone permission...')
+      const permissionLogPrefix = BROWSER_INFO.isSafari ? '🦁 Safari: Requesting microphone permission...' : '🎮 Requesting microphone permission...'
+      console.log(permissionLogPrefix)
       const granted = await requestPermission()
       if (!granted) {
-        console.log('🎮 Permission denied, cannot start voice input')
+        const deniedLogPrefix = BROWSER_INFO.isSafari ? '🦁 Safari: Permission denied' : '🎮 Permission denied, cannot start voice input'
+        console.log(deniedLogPrefix)
         // Error message is already set by requestPermission
         return
       }
     }
     
-    console.log('🎮 Push-to-Talk started')
+    console.log(BROWSER_INFO.isSafari ? '🦁 Safari Push-to-Talk started' : '🎮 Push-to-Talk started')
     setIsPushToTalkHeld(true)
     startPushToTalk()
   }
 
   const handlePushToTalkEnd = () => {
     if (!voiceSupported || !isPushToTalkHeld) return
-    console.log('🎮 Push-to-Talk ended, current state:', { 
+    
+    const logPrefix = BROWSER_INFO.isSafari ? '🦁 Safari Push-to-Talk ended:' : '🎮 Push-to-Talk ended, current state:'
+    console.log(logPrefix, { 
       transcript, 
       value, 
-      isListening 
+      isListening,
+      isSafari: BROWSER_INFO.isSafari
     })
     setIsPushToTalkHeld(false)
     stopPushToTalk()
@@ -209,24 +225,40 @@ function AnswerInput({
 
   const getPushToTalkButtonTitle = () => {
     if (!voiceSupported) {
-      return "Voice input not supported in this browser"
+      return BROWSER_INFO.isSafari 
+        ? "Voice input not supported in this version of Safari"
+        : "Voice input not supported in this browser"
     }
     if (voiceError && voiceError.includes('secure')) {
-      return "HTTPS required for microphone access"
+      return BROWSER_INFO.isSafari
+        ? "Safari requires HTTPS for microphone access"
+        : "HTTPS required for microphone access"
     }
     if (permissionGranted === false) {
-      return "Microphone access denied - click to request permission again"
+      return BROWSER_INFO.isSafari
+        ? "Microphone access denied - tap to request permission again (check Safari settings)"
+        : "Microphone access denied - click to request permission again"
     }
     if (voiceState === 'error' && voiceError) {
-      return `Error: ${voiceError}`
+      // Use Safari-specific error message if available
+      const errorMsg = BROWSER_INFO.isSafari 
+        ? getSafariErrorMessage(voiceError.split(':')[0] || voiceError, BROWSER_INFO)
+        : voiceError
+      return `Error: ${errorMsg}`
     }
     if (isListening || isPushToTalkHeld) {
-      return "Release to submit your answer"
+      return BROWSER_INFO.isSafari
+        ? "Release to submit your answer (Safari)"
+        : "Release to submit your answer"
     }
     if (permissionGranted === null) {
-      return "Hold to speak (will request microphone permission)"
+      return BROWSER_INFO.isSafari
+        ? "Hold to speak (Safari will request microphone permission)"
+        : "Hold to speak (will request microphone permission)"
     }
-    return "Hold to speak (Push-to-Talk)"
+    return BROWSER_INFO.isSafari
+      ? "Hold to speak (Push-to-Talk Safari)"
+      : "Hold to speak (Push-to-Talk)"
   }
 
   return (

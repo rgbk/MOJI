@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { puzzleService } from '../lib/puzzles'
 import { settingsService } from '../lib/settings'
 import { uiCopyService } from '../lib/uiCopy'
+import MicrophoneSetup from '../components/MicrophoneSetup'
+import DebugOverlay from '../components/DebugOverlay'
 
 function Lobby() {
   const { roomId } = useParams()
@@ -16,6 +18,8 @@ function Lobby() {
   const [isCreator, setIsCreator] = useState(false)
   const [pendingPlayer, setPendingPlayer] = useState<RoomPlayer | null>(null)
   const [copied, setCopied] = useState(false)
+  const [microphoneDebugInfo, setMicrophoneDebugInfo] = useState<any>(null)
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
 
   useEffect(() => {
     if (!roomId) {
@@ -78,14 +82,30 @@ function Lobby() {
       // Check if I created this room
       const amICreator = sessionStorage.getItem(`room-creator-${roomId}`) === 'true'
       
-      // Only join as Player 2 if I didn't create this room
-      if (playersData.length === 1 && playersData[0]?.is_creator && !amICreator) {
+      // Only join as Player 2 if I didn't create this room and haven't already joined
+      const hasPlayerTwo = playersData.some(p => !p.is_creator)
+      const shouldJoinAsPlayerTwo = playersData.length === 1 && playersData[0]?.is_creator && !amICreator && !hasJoinedRoom && !hasPlayerTwo
+      
+      console.log('🔍 Join room check:', {
+        playersLength: playersData.length,
+        hasCreator: playersData.some(p => p.is_creator),
+        amICreator,
+        hasJoinedRoom,
+        hasPlayerTwo,
+        shouldJoinAsPlayerTwo
+      })
+      
+      if (shouldJoinAsPlayerTwo) {
         try {
+          console.log('🚪 Attempting to join room as Player 2')
+          setHasJoinedRoom(true) // Prevent multiple join attempts
           await roomService.joinRoom(roomId!)
           // Reload players after joining
           playersData = await roomService.getRoomPlayers(roomId!)
+          console.log('✅ Successfully joined room')
         } catch (err) {
-          console.error('Failed to join room:', err)
+          console.error('❌ Failed to join room:', err)
+          setHasJoinedRoom(false) // Reset on failure so user can retry
         }
       }
       
@@ -207,6 +227,11 @@ function Lobby() {
     <div className="text-center">
       <h1 className="text-4xl font-bold mb-8">{uiCopyService.getValue('lobby.title')}</h1>
       
+      {/* Microphone Setup */}
+      <div className="max-w-md mx-auto mb-6">
+        <MicrophoneSetup onDebugInfo={setMicrophoneDebugInfo} />
+      </div>
+      
       {players.length === 1 ? (
         <div>
           <p className="text-xl text-gray-400 mb-8">{uiCopyService.getValue('lobby.share')}</p>
@@ -264,6 +289,12 @@ function Lobby() {
   const joinerView = (
     <div className="text-center">
       <h1 className="text-4xl font-bold mb-4">MOJI!</h1>
+      
+      {/* Microphone Setup */}
+      <div className="max-w-md mx-auto mb-6">
+        <MicrophoneSetup onDebugInfo={setMicrophoneDebugInfo} />
+      </div>
+      
       {(() => {
         const myPlayer = players.find(p => !p.is_creator)
         if (myPlayer?.approved) {
@@ -284,6 +315,31 @@ function Lobby() {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center px-4">
       {isCreator ? creatorView : joinerView}
+      
+      <DebugOverlay 
+        viewName="Lobby"
+        additionalInfo={{
+          roomId,
+          isCreator,
+          playersCount: players.length,
+          loading,
+          error: error || 'none',
+          pendingPlayer: pendingPlayer?.player_name || 'none',
+          copied,
+          players: players.map(p => ({
+            name: p.player_name,
+            isCreator: p.is_creator,
+            approved: p.approved
+          })),
+          sessionStorage: {
+            roomCreator: sessionStorage.getItem(`room-creator-${roomId}`)
+          },
+          localStorage: {
+            micPermission: localStorage.getItem('moji-mic-permission')
+          },
+          microphone: microphoneDebugInfo || 'loading...'
+        }}
+      />
     </div>
   )
 }
