@@ -427,26 +427,47 @@ export default function Admin() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-white font-semibold mb-2">Video File (optional)</label>
-                  <input
-                    type="text"
-                    value={formData.videoFile || ''}
-                    onChange={(e) => setFormData({...formData, videoFile: e.target.value})}
-                    className="w-full p-2 rounded bg-white/20 text-white placeholder-white/50"
-                    placeholder="video-name.mp4"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-white font-semibold mb-2">Video URL (optional)</label>
-                  <input
-                    type="url"
-                    value={formData.videoUrl || ''}
-                    onChange={(e) => setFormData({...formData, videoUrl: e.target.value})}
-                    className="w-full p-2 rounded bg-white/20 text-white placeholder-white/50"
-                    placeholder="https://youtube.com/embed/..."
-                  />
+                {/* Video Section */}
+                <div className="bg-white/10 p-4 rounded-lg border border-white/20">
+                  <h3 className="text-white font-bold mb-3">📹 Video Settings</h3>
+                  
+                  <div className="mb-3">
+                    <label className="block text-white font-semibold mb-2">Mux Playback ID (recommended)</label>
+                    <input
+                      type="text"
+                      value={formData.muxPlaybackId || ''}
+                      onChange={(e) => setFormData({...formData, muxPlaybackId: e.target.value})}
+                      className="w-full p-2 rounded bg-white/20 text-white placeholder-white/50"
+                      placeholder="kXo6ovbBXtuepLEVjk8OOA4IUqorEhutWd02LVermS7c"
+                    />
+                    <p className="text-white/60 text-sm mt-1">Professional streaming with auto-transcoding and global CDN</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-white font-semibold mb-2">Video File (fallback)</label>
+                      <input
+                        type="text"
+                        value={formData.videoFile || ''}
+                        onChange={(e) => setFormData({...formData, videoFile: e.target.value})}
+                        className="w-full p-2 rounded bg-white/20 text-white placeholder-white/50"
+                        placeholder="video-name.mp4"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-white font-semibold mb-2">Video URL (fallback)</label>
+                      <input
+                        type="url"
+                        value={formData.videoUrl || ''}
+                        onChange={(e) => setFormData({...formData, videoUrl: e.target.value})}
+                        className="w-full p-2 rounded bg-white/20 text-white placeholder-white/50"
+                        placeholder="https://youtube.com/embed/..."
+                      />
+                    </div>
+                  </div>
+                  
+                  <p className="text-white/60 text-sm mt-2">💡 Priority: Mux → Video File → Video URL</p>
                 </div>
 
                 {/* New AI-generated fields */}
