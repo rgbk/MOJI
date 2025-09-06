@@ -105,26 +105,19 @@ export function useVoiceRecognition(
     if (roomId && permissionGranted !== null) {
       const storageKey = `moji-mic-permission-${roomId}`
       localStorage.setItem(storageKey, permissionGranted ? 'granted' : 'denied')
-      console.log('🎤 Saved permission to storage:', { roomId, granted: permissionGranted })
     }
   }, [roomId, permissionGranted])
   
   // Initialize permission from localStorage on mount
   useEffect(() => {
-    console.log('🎤 PERMISSION: Initializing for roomId:', roomId)
     if (roomId) {
       const storageKey = `moji-mic-permission-${roomId}`
       const saved = localStorage.getItem(storageKey)
-      console.log('🎤 PERMISSION: Storage check -', { storageKey, saved })
       
       if (saved === 'granted') {
-        console.log('🎤 PERMISSION: Setting to TRUE from storage')
         setPermissionGranted(true)
       } else if (saved === 'denied') {
-        console.log('🎤 PERMISSION: Setting to FALSE from storage')
         setPermissionGranted(false)
-      } else {
-        console.log('🎤 PERMISSION: No saved permission, leaving as null')
       }
     }
   }, [roomId])
@@ -139,8 +132,6 @@ export function useVoiceRecognition(
 
   // Initialize and check browser support
   useEffect(() => {
-    console.log('🎤 Custom voice recognition hook initialized')
-    
     // Check secure context
     const isSecureContext = window.isSecureContext || 
       window.location.protocol === 'https:' || 
@@ -154,7 +145,6 @@ export function useVoiceRecognition(
 
     if (isSupported) {
       setState('idle')
-      console.log('🎤 Speech recognition supported')
     } else {
       setState('not-supported')
       setError('Speech recognition not supported in this browser')
@@ -170,10 +160,8 @@ export function useVoiceRecognition(
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
         })
         stream.getTracks().forEach(track => track.stop())
-        console.log('🎤 Safari: Real permission test passed')
         return 'granted'
       } catch (err: any) {
-        console.log('🎤 Safari: Real permission test failed:', err.name)
         if (err.name === 'NotAllowedError') {
           return 'denied'
         }
@@ -204,7 +192,6 @@ export function useVoiceRecognition(
     }
     
     try {
-      console.log('🎤 Requesting microphone permission...')
       
       // For mobile, use less aggressive audio settings
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
@@ -228,13 +215,11 @@ export function useVoiceRecognition(
       
       const permissionTime = performance.now() - startTime
       setMetrics(prev => ({ ...prev, permissionTime }))
-      console.log(`🎤 Permission granted in ${permissionTime.toFixed(0)}ms`)
       
       setPermissionGranted(true)
       setError(null)
       setState('idle')
       
-      console.log('🎤 Microphone permission granted')
       return true
       
     } catch (err: any) {
@@ -252,7 +237,6 @@ export function useVoiceRecognition(
       return recognitionRef.current
     }
 
-    console.log('🎤 Creating new SpeechRecognition instance')
     const recognition = new SpeechRecognitionClass()
 
     // Configure recognition settings with mobile optimizations
@@ -265,7 +249,6 @@ export function useVoiceRecognition(
     // Event handlers
     recognition.onstart = () => {
       const now = performance.now()
-      console.log('🎤 TOGGLE: Started listening - continuous =', continuous)
       setIsListening(true)
       setState('listening')
       setError(null)
@@ -288,7 +271,6 @@ export function useVoiceRecognition(
       
       // Safety timeout for toggle recording (60s max)
       timeoutRef.current = setTimeout(() => {
-        console.log('🎤 TOGGLE: Auto-timeout after 60s for safety')
         if (recognitionRef.current) {
           recognitionRef.current.stop()
         }
@@ -296,23 +278,19 @@ export function useVoiceRecognition(
     }
 
     recognition.onaudiostart = () => {
-      console.log('🎤 TOGGLE: Audio started')
     }
 
     recognition.onspeechstart = () => {
-      console.log('🎤 TOGGLE: Speech detected')
     }
 
     recognition.onresult = (event: any) => {
       const now = performance.now()
-      console.log('🎤 TOGGLE: Result received')
       
       // Track performance metrics
       setMetrics(prev => {
         const updated = { ...prev, resultCount: prev.resultCount + 1 }
         if (!prev.firstResultTime && prev.startTime) {
           updated.firstResultTime = now
-          console.log(`🎤 First result in ${(now - prev.startTime).toFixed(0)}ms`)
         }
         return updated
       })
@@ -328,7 +306,6 @@ export function useVoiceRecognition(
         if (result.isFinal) {
           finalTranscript += transcriptPart
           maxConfidence = Math.max(maxConfidence, result[0].confidence || 0.5)
-          console.log('🎤 TOGGLE: FINAL result:', transcriptPart, '- SHOULD NOT AUTO-STOP!')
           
           // Track final result time
           setMetrics(prev => ({
@@ -338,7 +315,6 @@ export function useVoiceRecognition(
           }))
         } else {
           interimTranscript += transcriptPart
-          console.log('🎤 Interim transcript:', transcriptPart)
         }
       }
 
@@ -369,7 +345,6 @@ export function useVoiceRecognition(
           setError(getErrorMessage('not-allowed'))
           break
         case 'no-speech':
-          console.log('🎤 No speech detected')
           setState('idle')
           break
         case 'audio-capture':
@@ -389,7 +364,6 @@ export function useVoiceRecognition(
     }
 
     recognition.onend = () => {
-      console.log('🎤 TOGGLE: Recognition ended - WHY? User did not stop it!')
       setIsListening(false)
       setState('idle')
       isStartingRef.current = false
@@ -417,20 +391,10 @@ export function useVoiceRecognition(
     // Debounce rapid calls (especially on mobile)
     const timeSinceLastStart = startTime - lastStartTime.current
     if (timeSinceLastStart < debounceDelay) {
-      console.log(`🎤 Debouncing: only ${timeSinceLastStart.toFixed(0)}ms since last start (min: ${debounceDelay}ms)`)
       return
     }
     lastStartTime.current = startTime
     
-    console.log('🎤 startListening called', {
-      isSupported,
-      isListening,
-      permissionGranted,
-      continuous,
-      language,
-      isStarting: isStartingRef.current,
-      isMobile: metrics.isMobile
-    })
     
     if (!isSupported) {
       console.error('🎤 Browser does not support speech recognition')
@@ -438,13 +402,11 @@ export function useVoiceRecognition(
     }
     
     if (isListening || isStartingRef.current) {
-      console.log('🎤 Already listening or starting, skipping')
       return
     }
 
     // Request permission if needed
     if (permissionGranted !== true) {
-      console.log('🎤 Requesting permission first...')
       const granted = await requestPermission()
       if (!granted) {
         console.error('🎤 Permission not granted')
@@ -474,7 +436,6 @@ export function useVoiceRecognition(
       // Start recognition immediately for all browsers
       try {
         recognition.start()
-        console.log('🎤 TOGGLE: Speech recognition start command sent')
       } catch (err) {
         console.error('🎤 Failed to start recognition:', err)
         isStartingRef.current = false
@@ -492,7 +453,6 @@ export function useVoiceRecognition(
 
   // Stop listening
   const stopListening = useCallback(() => {
-    console.log('🎤 TOGGLE: stopListening called by USER')
     
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop()
@@ -503,7 +463,6 @@ export function useVoiceRecognition(
   const resetTranscript = useCallback(() => {
     setTranscript('')
     setConfidence(0)
-    console.log('🎤 Transcript reset')
   }, [])
 
   // Cleanup on unmount
@@ -521,12 +480,10 @@ export function useVoiceRecognition(
 
   // Push-to-Talk methods
   const startPushToTalk = useCallback(() => {
-    console.log('🎤 Starting Push-to-Talk')
     startListening()
   }, [startListening])
 
   const stopPushToTalk = useCallback(() => {
-    console.log('🎤 Stopping Push-to-Talk')
     stopListening()
   }, [stopListening])
 

@@ -73,9 +73,7 @@ const defaultUICopy: UICopySection[] = [
     values: {
       'home.title': 'MOJI!',
       'home.subtitle': 'Guess the music from emojis',
-      'home.button.start': 'START NEW GAME',
-      'home.button.join': 'JOIN GAME',
-      'home.button.admin': 'ADMIN'
+      'home.button.start': 'START NEW GAME'
     }
   },
   {
@@ -276,6 +274,35 @@ class UICopyService {
     if (section) {
       section.values = { ...section.values, ...values }
       await this.saveCopy(values)
+    }
+  }
+
+  async deleteKey(key: string) {
+    try {
+      const { error } = await supabase
+        .from('ui_copy')
+        .delete()
+        .eq('key', key)
+
+      if (error) {
+        console.error('Failed to delete UI copy key:', error)
+        throw error
+      }
+
+      // Remove from local cache
+      this.copyMap.delete(key)
+      
+      // Rebuild sections
+      const [sectionId] = key.split('.')
+      const section = this.copy.find(s => s.id === sectionId)
+      if (section) {
+        delete section.values[key]
+      }
+
+      console.log(`✅ Deleted unused UI copy key: ${key}`)
+    } catch (error) {
+      console.error(`❌ Failed to delete UI copy key ${key}:`, error)
+      throw error
     }
   }
 

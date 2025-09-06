@@ -115,6 +115,32 @@ export default function UICopyTab() {
             📤 Export
           </button>
           <button
+            onClick={async () => {
+              if (confirm('Delete unused home.button.admin and home.button.join keys?')) {
+                try {
+                  // Delete from database using the service
+                  const { createClient } = await import('@supabase/supabase-js')
+                  const supabase = createClient(
+                    import.meta.env.VITE_SUPABASE_URL,
+                    import.meta.env.VITE_SUPABASE_ANON_KEY
+                  )
+                  
+                  await supabase.from('ui_copy').delete().eq('key', 'home.button.admin')
+                  await supabase.from('ui_copy').delete().eq('key', 'home.button.join')
+                  
+                  // Reload sections to refresh UI
+                  loadSections()
+                  alert('✅ Deleted unused keys!')
+                } catch (error) {
+                  alert('❌ Failed to delete keys: ' + error.message)
+                }
+              }
+            }}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors"
+          >
+            🗑️ Clean Unused
+          </button>
+          <button
             onClick={handleReset}
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
           >

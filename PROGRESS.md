@@ -159,3 +159,28 @@ The multiplayer system is fully functional with:
 - Fixed localStorage permission loading
 
 **KEY LESSON: Don't add artificial delays or "workarounds" - fix the root cause!**
+
+## 🎯 UI Simplification (Sept 6, 2025 - Session 2)
+
+### Major UX Overhaul: Minimal Voice Interface
+- **Removed all text input fields** - Pure voice-first experience
+- **Single button design**:
+  - 🎤 "READY" (blue) → Click to start recording
+  - ● "STOP" (green with pulse) → Click to stop and auto-submit
+- **Clean transcript display** - Shows below button only when speaking/listening
+- **Removed verbose instructions** - No more "Type your answer..." guidance text
+- **Eliminated submit/clue buttons** from answer input - Focused purely on voice interaction
+
+### Design Philosophy
+- **Voice-first UX** - Interface designed around voice interaction, not typing
+- **Minimal cognitive load** - One button, clear states, immediate feedback
+- **Mobile-optimized** - Large touch targets, simple interactions
+- **Auto-submission** - Users don't need to think about submitting after speaking
+
+### Technical Implementation
+- Hidden input field maintains compatibility with existing voice recognition hooks
+- Transcript display only appears during active voice interaction
+- Button states provide clear visual feedback (blue → green → auto-submit)
+- Removed 123 lines of UI code for cleaner, focused component
+
+**RESULT: Ultra-clean voice interface ready for mobile testing** 🎙️

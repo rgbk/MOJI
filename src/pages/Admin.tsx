@@ -662,8 +662,8 @@ export default function Admin() {
           currentTab: activeTab,
           puzzlesCount: puzzles.length,
           selectedPuzzle: selectedPuzzle?.id || 'none',
-          showEmojiPicker,
-          isEditing: !!editingId
+          showEmojiPicker: isEmojiPickerOpen,
+          isEditing: !!isEditing
         }}
       />
     </div>
