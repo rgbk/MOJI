@@ -4,6 +4,7 @@ import { roomService } from '../lib/rooms'
 import { debugSupabase } from '../lib/debug'
 import { uiCopyService } from '../lib/uiCopy'
 import DebugOverlay from '../components/DebugOverlay'
+import { Button } from '../components/ui/button'
 
 function Home() {
   const navigate = useNavigate()
@@ -59,13 +60,14 @@ function Home() {
       )}
 
       {/* Start Game Button */}
-      <button
+      <Button
         onClick={handleStartNewGame}
         disabled={creating}
-        className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors duration-200 shadow-lg hover:shadow-purple-500/25"
+        size="lg"
+        className="text-xl py-8 px-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-purple-800 disabled:to-pink-800 text-white font-bold rounded-xl shadow-lg hover:shadow-purple-500/25 transition-all duration-200"
       >
         {creating ? 'CREATING ROOM...' : (uiCopyLoaded ? uiCopyService.getValue('home.button.start') : 'START NEW GAME')}
-      </button>
+      </Button>
       
       <DebugOverlay 
         viewName="Home"

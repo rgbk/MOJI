@@ -6,6 +6,7 @@ import SettingsTab from '../components/SettingsTab';
 import UICopyTab from '../components/UICopyTab';
 import { puzzleService, type Puzzle } from '../lib/puzzles';
 import DebugOverlay from '../components/DebugOverlay';
+import { Button } from '../components/ui/button';
 
 // Emoji categories for the picker
 const EMOJI_CATEGORIES = {
@@ -223,62 +224,65 @@ export default function Admin() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold text-white">MOJI Admin</h1>
           <div className="flex gap-4">
-            <button
+            <Button
               onClick={() => testClaudeAPI()}
-              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors"
+              className="bg-yellow-600 hover:bg-yellow-700 font-semibold"
             >
               🔍 Test Models
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleExportPuzzles}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 font-semibold"
             >
               💾 Export
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleAddNew}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
+              className="px-6 bg-green-600 hover:bg-green-700 font-semibold"
             >
               Add New Puzzle
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex gap-4 mb-6">
-          <button
+          <Button
             onClick={() => setActiveTab('puzzles')}
+            variant={activeTab === 'puzzles' ? 'secondary' : 'ghost'}
             className={cn(
-              "px-6 py-3 rounded-lg font-semibold transition-colors",
+              "font-semibold",
               activeTab === 'puzzles'
                 ? "bg-white/20 text-white"
                 : "bg-white/10 text-white/70 hover:text-white hover:bg-white/15"
             )}
           >
             🧩 Puzzles
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab('settings')}
+            variant={activeTab === 'settings' ? 'secondary' : 'ghost'}
             className={cn(
-              "px-6 py-3 rounded-lg font-semibold transition-colors",
+              "font-semibold",
               activeTab === 'settings'
                 ? "bg-white/20 text-white"
                 : "bg-white/10 text-white/70 hover:text-white hover:bg-white/15"
             )}
           >
             ⚙️ Settings
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab('copy')}
+            variant={activeTab === 'copy' ? 'secondary' : 'ghost'}
             className={cn(
-              "px-6 py-3 rounded-lg font-semibold transition-colors",
+              "font-semibold",
               activeTab === 'copy'
                 ? "bg-white/20 text-white"
                 : "bg-white/10 text-white/70 hover:text-white hover:bg-white/15"
             )}
           >
             📝 UI Copy
-          </button>
+          </Button>
         </div>
 
         {/* Tab Content */}

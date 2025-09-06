@@ -7,6 +7,7 @@ import { settingsService } from '../lib/settings'
 import { uiCopyService } from '../lib/uiCopy'
 import MicrophoneSetup from '../components/MicrophoneSetup'
 import DebugOverlay from '../components/DebugOverlay'
+import { Button } from '../components/ui/button'
 
 function Lobby() {
   const { roomId } = useParams()
@@ -217,12 +218,12 @@ function Lobby() {
           <div className="text-4xl mb-4">❌</div>
           <h2 className="text-xl font-bold mb-2">Room Error</h2>
           <p className="text-red-400 mb-4">{error}</p>
-          <button 
+          <Button 
             onClick={() => navigate('/')}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+            className="bg-purple-600 hover:bg-purple-700"
           >
             Back to Home
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -240,17 +241,18 @@ function Lobby() {
       {players.length === 1 ? (
         <div>
           <p className="text-xl text-gray-400 mb-8">{uiCopyService.getValue('lobby.share')}</p>
-          <button
+          <Button
             onClick={handleCopyGameLink}
             disabled={copied}
+            size="lg"
             className={`${
               copied 
                 ? 'bg-green-600 cursor-not-allowed' 
                 : 'bg-blue-600 hover:bg-blue-700'
-            } text-white font-bold py-3 px-6 rounded-xl text-lg transition-all duration-200 min-w-[200px]`}
+            } text-lg min-w-[200px]`}
           >
             {copied ? `✓ ${uiCopyService.getValue('lobby.copied')}` : uiCopyService.getValue('lobby.copy')}
-          </button>
+          </Button>
           {copied && (
             <p className="text-sm text-gray-500 mt-3 animate-fade-in">
               {uiCopyService.getValue('lobby.copied.help')}
@@ -261,12 +263,13 @@ function Lobby() {
         <div>
           <p className="text-xl text-yellow-400 mb-4">🚨 {pendingPlayer.player_name} {uiCopyService.getValue('lobby.join.alert')}</p>
           <p className="text-gray-400 mb-6">{uiCopyService.getValue('lobby.join.help')}</p>
-          <button
+          <Button
             onClick={handleAdmitPlayer}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-xl text-lg transition-colors duration-200 mb-4"
+            size="lg"
+            className="bg-yellow-600 hover:bg-yellow-700 text-lg mb-4"
           >
             {uiCopyService.getValue('lobby.join.button')} {pendingPlayer.player_name}
-          </button>
+          </Button>
         </div>
       ) : (
         <div>
@@ -280,12 +283,13 @@ function Lobby() {
               ))}
             </div>
           </div>
-          <button
+          <Button
             onClick={handleStartGame}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl text-lg transition-colors duration-200"
+            size="lg"
+            className="bg-green-600 hover:bg-green-700 text-lg"
           >
             {uiCopyService.getValue('lobby.start')}
-          </button>
+          </Button>
         </div>
       )}
     </div>
