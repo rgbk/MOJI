@@ -74,12 +74,12 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
   // Get the actual room/game ID from params
   const actualRoomId = params.roomId || params.gameId
   
-  // Get all mic permission keys from sessionStorage
-  const allMicPermissionKeys = Object.keys(sessionStorage)
+  // Get all mic permission keys from localStorage (simplified for new implementation)
+  const allMicPermissionKeys = Object.keys(localStorage)
     .filter(key => key.includes('moji-mic-permission'))
     .map(key => ({
       key,
-      value: sessionStorage.getItem(key)
+      value: localStorage.getItem(key)
     }))
   
   // Get relevant info
@@ -87,15 +87,14 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
     view: autoViewName,
     path: location.pathname,
     
-    // CRITICAL SAFARI DEBUG
-    ...(BROWSER_INFO.isSafari ? {
-      '🦁 ROOM_ID': actualRoomId || 'none',
-      '🦁 SESSION_KEY': actualRoomId ? `moji-mic-permission-${actualRoomId}` : 'none',
-      '🦁 SESSION_VALUE': actualRoomId ? sessionStorage.getItem(`moji-mic-permission-${actualRoomId}`) : 'none',
-      '🦁 ALL_MIC_KEYS': allMicPermissionKeys.length > 0 ? allMicPermissionKeys : 'none',
-      '🦁 VOICE_PERMISSION': voice.permissionGranted,
-      '🦁 VOICE_ERROR': voice.error || 'none',
-    } : {}),
+    // Voice recognition debug info
+    'room_id': actualRoomId || 'none',
+    'storage_key': actualRoomId ? `moji-mic-permission-${actualRoomId}` : 'none',
+    'storage_value': actualRoomId ? localStorage.getItem(`moji-mic-permission-${actualRoomId}`) : 'none',
+    'voice_permission': voice.permissionGranted,
+    'voice_error': voice.error || 'none',
+    'voice_supported': voice.isSupported,
+    'voice_listening': voice.isListening,
     
     time: timestamp,
     
@@ -113,7 +112,7 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
     
     const stateString = `🐛 MOJI Debug State: ${autoViewName}\n` +
       `🕐 ${timestamp}\n` +
-      (BROWSER_INFO.isSafari ? `🦁 Safari Voice Issues Detected\n` : '') +
+      (BROWSER_INFO.isSafari ? `🦁 Safari Browser Detected\n` : '') +
       (voice.error ? `❌ Voice Error: ${voice.error}\n` : '') +
       `\n📱 Voice Recognition Status:\n` +
       Object.entries(filteredInfo)

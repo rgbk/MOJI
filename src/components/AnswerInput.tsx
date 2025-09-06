@@ -27,19 +27,10 @@ function AnswerInput({
   const { roomId, gameId } = useParams()
   const actualRoomId = roomId || gameId // Use gameId if roomId is not available
   
-  // Safari navigation debug
+  // Component initialization logging
   useEffect(() => {
-    if (BROWSER_INFO.isSafari && actualRoomId) {
-      console.log('🦁 Safari Game Voice Debug: Component loaded', {
-        roomId,
-        gameId, 
-        actualRoomId,
-        sessionKey: `moji-mic-permission-${actualRoomId}`,
-        sessionValue: sessionStorage.getItem(`moji-mic-permission-${actualRoomId}`),
-        allSessionKeys: Object.keys(sessionStorage).filter(key => key.includes('moji-mic-permission'))
-      })
-    }
-  }, [actualRoomId, roomId, gameId])
+    console.log('🎮 AnswerInput loaded for room:', actualRoomId)
+  }, [actualRoomId])
   const [isPushToTalkHeld, setIsPushToTalkHeld] = useState(false)
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false)
 
@@ -296,44 +287,12 @@ function AnswerInput({
                  'Push-to-Talk ready'}
               </span>
             </div>
-            {/* Game Debug Button */}
-            {BROWSER_INFO.isSafari && (
-              <button
-                onClick={async () => {
-                  const gameDebug = {
-                    timestamp: new Date().toLocaleTimeString(),
-                    roomId: actualRoomId,
-                    voiceState,
-                    voiceSupported,
-                    isListening,
-                    permissionGranted,
-                    voiceError,
-                    transcript: transcript || 'none',
-                    confidence,
-                    safariVersion: BROWSER_INFO.safariVersion,
-                    protocol: window.location.protocol,
-                    hostname: window.location.hostname,
-                    sessionStorageKey: `moji-mic-permission-${actualRoomId}`,
-                    sessionStorageValue: sessionStorage.getItem(`moji-mic-permission-${actualRoomId}`),
-                    webSpeechAvailable: !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition),
-                    mediaDevicesAvailable: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-                  }
-                  
-                  const debugText = `🦁 SAFARI GAME DEBUG:\n${JSON.stringify(gameDebug, null, 2)}`
-                  
-                  try {
-                    await navigator.clipboard.writeText(debugText)
-                    console.log('🦁 Safari game debug copied to clipboard')
-                  } catch (err) {
-                    console.error('Failed to copy game debug:', err)
-                  }
-                }}
-                className="text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-white"
-                title="Copy Safari voice debug info"
-              >
-                🦁 DEBUG
-              </button>
-            )}
+            {/* Voice Status Indicator */}
+            <div className="text-xs text-gray-400">
+              {permissionGranted === true ? '✓ Ready' : 
+               permissionGranted === false ? '✗ Denied' : 
+               '? Unknown'}
+            </div>
           </div>
           
           {transcript && (

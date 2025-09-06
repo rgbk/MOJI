@@ -26,6 +26,32 @@
 
 **Remember:** Great games use great tools. Don't waste time on problems that were solved in 2015!
 
+## CRITICAL: Validate Core Features Cross-Platform FIRST! 🚨🚨🚨
+
+**BEFORE building ANY core UX feature, ALWAYS verify cross-browser support:**
+
+### Core Feature Research Checklist:
+1. **Safari Mobile Support**: Research if core APIs work on Safari mobile/PWA mode
+2. **Cross-Browser Testing**: Test on ALL target browsers BEFORE building
+3. **Known Limitations**: Search for "{API} Safari mobile issues" and "{API} PWA limitations"  
+4. **Alternative Solutions**: If browser API has known issues, research cloud/server alternatives IMMEDIATELY
+
+### High-Risk Features That Need Upfront Research:
+- **Voice recognition (Web Speech API)** - Safari mobile/PWA has major limitations
+- **WebRTC/Media streams** - Safari permission quirks and PWA restrictions  
+- **Local storage persistence** - Safari private mode clearing behavior
+- **Push notifications** - iOS Safari PWA restrictions
+- **Camera/microphone access** - Safari permission complexity
+
+### Example Research Queries:
+- "Web Speech API Safari mobile PWA limitations"
+- "react-speech-recognition Safari issues"
+- "{feature name} not working Safari mobile"
+
+**NEVER spend hours debugging a feature without first confirming it's technically possible on target platforms.**
+
+**If a core UX feature doesn't work reliably across target browsers, pivot to alternative solutions (cloud APIs, different approaches) IMMEDIATELY rather than wasting time on impossible implementations.**
+
 ## Critical Mobile Testing Setup Protocol 🚨
 
 **IMPORTANT: User has FREE ngrok account = ONLY 1 tunnel allowed at a time**

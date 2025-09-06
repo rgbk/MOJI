@@ -13,7 +13,7 @@ function MicrophoneSetup({ onPermissionGranted, compact = false, onDebugInfo }: 
   const { roomId } = useParams()
   const [isTestingMic, setIsTestingMic] = useState(false)
   
-  console.log('🎙️ MicrophoneSetup component rendered/re-rendered for room:', roomId)
+  console.log('🎤 MicrophoneSetup component rendered for room:', roomId)
   
   const {
     isSupported,

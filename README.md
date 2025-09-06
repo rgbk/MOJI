@@ -1,33 +1,57 @@
-# 🚀 VibeCodeStack
+# 🎮 MOJI! - Real-time Multiplayer Music Guessing Game
 
-> The ultimate template for rapid, modern web development optimized for Claude Code with Swiss Army Knife dev tools.
+> A fun, fast-paced multiplayer game where players guess songs from emoji clues using voice or text input.
 
-## ✨ What's Inside
+## ✨ Features
 
-- ⚡️ **Vite** - Lightning fast build tool
-- ⚛️ **React 18** + **TypeScript** - Modern React with full type safety  
-- 🎨 **Tailwind CSS** - Utility-first styling for rapid UI development
-- 📱 **PWA Ready** - Offline-first with service workers
-- 🧪 **Vitest** - Fast unit testing
-- 🔍 **ESLint + Prettier** - Code quality and formatting
-- 🛠️ **clsx + tailwind-merge** - Smart className utilities
+- 🎵 **Music Guessing** - Guess songs from emoji clues
+- 🎙️ **Voice Input** - Use speech recognition for answers (Chrome/Edge)
+- 👥 **Real-time Multiplayer** - Play with friends in real-time
+- 📱 **Progressive Web App** - Install on mobile devices
+- 🏆 **Competitive Scoring** - Speed and accuracy matter
+- 🎨 **Beautiful UI** - Dark theme with smooth animations
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Install dev tools (one-time setup)
-brew install pnpm bat eza fd ripgrep fzf tree jq git-delta && npm install -g sharp-cli typescript vite
-
-# 2. Use this template
-gh repo create my-project --template rgbk/VibeCodeStack
-cd my-project
-
-# 3. Install dependencies (using pnpm for speed)
+# Install dependencies
 pnpm install
 
-# 4. Start development
+# Start development server
 pnpm dev
+
+# For mobile testing with Cloudflare tunnel
+cloudflared tunnel --url http://localhost:5173
 ```
+
+## 📱 Browser Compatibility
+
+| Browser | Desktop | Mobile | Voice Input | Notes |
+|---------|---------|---------|-------------|-------|
+| Chrome | ✅ Full Support | ✅ Full Support | ✅ Works | Best experience |
+| Edge | ✅ Full Support | ✅ Full Support | ✅ Works | Same as Chrome |
+| Firefox | ✅ Full Support | ✅ Full Support | ❌ Not Supported | Text input only |
+| Safari | ✅ Full Support | ⚠️ Limited | ❌ Not Working | Voice recognition issues on mobile/PWA |
+
+### ⚠️ Safari Mobile Limitations
+
+**Current Issue**: Web Speech API doesn't work reliably on Safari mobile, especially in:
+- Private/Incognito mode
+- PWA (installed app) mode
+- Cross-page navigation scenarios
+
+**Workaround**: Safari mobile users should use text input for now.
+
+**Future Solution**: Planning to implement cloud-based speech recognition (Deepgram/Whisper API) for full Safari support.
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React + TypeScript + Vite
+- **Styling**: Tailwind CSS
+- **Backend**: Supabase (PostgreSQL + Realtime)
+- **Voice**: Web Speech API (Chrome/Edge)
+- **Hosting**: Vercel/Netlify ready
+- **PWA**: Service workers + manifest
 
 ## 📝 Available Scripts
 
@@ -36,51 +60,56 @@ pnpm dev             # Start dev server
 pnpm build           # Production build
 pnpm preview         # Preview production build
 pnpm lint            # Check code quality
-pnpm lint:fix        # Fix linting issues
-pnpm format          # Format code with Prettier
-pnpm test            # Run tests
-pnpm test:ui         # Run tests with UI
 pnpm type-check      # TypeScript type checking
 ```
 
-## 🛠️ Claude Code Optimized Dev Tools
+## 🎮 How to Play
 
-This template includes a complete Swiss Army Knife setup for maximum productivity:
+1. **Create or Join Room**: Start a new game or join with a room code
+2. **Test Microphone**: Enable mic permissions in the lobby (Chrome/Edge only)
+3. **Guess the Song**: See emoji clues and speak or type your answer
+4. **Score Points**: Faster correct answers = more points
+5. **Win**: Player with most points after all puzzles wins!
 
-### Modern CLI Tools
-- **pnpm** - Faster package manager than npm
-- **bat** - Better `cat` with syntax highlighting
-- **eza** - Better `ls` with colors and icons  
-- **rg** (ripgrep) - Lightning fast search
-- **fzf** - Fuzzy finder for everything
-- **fd** - Better `find` command
-- **jq** - JSON processor
-- **tree** - Directory tree viewer
-- **git-delta** - Beautiful git diffs
+## 🔧 Development
 
-### Global Development Tools
-- **sharp-cli** - Image processing
-- **typescript** - Global TypeScript compiler
-- **vite** - Global Vite for quick prototyping
+### Environment Variables
 
-## 🏗️ Project Structure
-
-```
-src/
-├── components/      # Reusable UI components
-├── hooks/          # Custom React hooks  
-├── lib/            # Utility functions
-├── pages/          # Page components
-└── styles/         # Global styles
+Create a `.env` file:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-## 🎯 Best Practices Included
+### Mobile Testing
 
-- **Type Safety** - Full TypeScript setup
-- **Code Quality** - ESLint with React-specific rules
-- **Formatting** - Prettier with Tailwind plugin
-- **Testing** - Vitest configured and ready
-- **PWA** - Service worker and manifest configured
-- **Performance** - Optimized build configuration
+For testing on mobile devices:
+```bash
+# Using Cloudflare tunnel (recommended)
+cloudflared tunnel --url http://localhost:5173
 
-Built with ❤️ for rapid development
+# Or using ngrok
+ngrok http 5173
+```
+
+## 📊 Project Status
+
+- ✅ Core game mechanics working
+- ✅ Multiplayer synchronization
+- ✅ Voice input (Chrome/Edge)
+- ✅ PWA installation
+- ⚠️ Safari mobile voice support (planned)
+- 🚧 Leaderboards (coming soon)
+- 🚧 Custom puzzle packs (coming soon)
+
+## 🤝 Contributing
+
+Contributions welcome! Please test on multiple browsers before submitting PRs.
+
+## 📄 License
+
+MIT
+
+---
+
+Built with ❤️ using React, TypeScript, and Supabase
