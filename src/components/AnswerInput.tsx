@@ -27,14 +27,14 @@ function AnswerInput({
   const { roomId, gameId } = useParams()
   const actualRoomId = roomId || gameId // Use gameId if roomId is not available
   
-  // Component initialization logging
+  // Component initialization
   useEffect(() => {
-    console.log('🎮 AnswerInput loaded for room:', actualRoomId)
+    // Component loaded
   }, [actualRoomId])
-  const [isPushToTalkHeld, setIsPushToTalkHeld] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
   const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false)
 
-  // Initialize voice recognition for Push-to-Talk with room-specific persistence
+  // Initialize voice recognition for toggle recording
   const {
     state: voiceState,
     transcript,
@@ -43,55 +43,53 @@ function AnswerInput({
     isListening,
     error: voiceError,
     permissionGranted,
-    startPushToTalk,
-    stopPushToTalk,
+    startListening,
+    stopListening,
     resetTranscript,
     requestPermission
   } = useVoiceRecognition({
     language: 'en-US',
-    continuous: true, // Keep listening while button is held
+    continuous: true, // Keep recording until manually stopped (toggle mode)
     interimResults: true,
     confidenceThreshold: 0.0, // Accept all confidence levels
     enableAudioFeedback: true
   }, actualRoomId)
 
-  // Always sync transcript to input field for Push-to-Talk
+  // Always sync transcript to input field for recording
   useEffect(() => {
     if (transcript) {
-      console.log('🎮 Syncing transcript to input:', transcript)
       onChange(transcript)
     }
   }, [transcript, onChange])
 
-  // Auto-submit when voice recognition completes and we have a transcript
+  // Update recording state when voice recognition state changes
   useEffect(() => {
-    if (shouldAutoSubmit && !isListening) {
-      console.log('🎮 Voice stopped listening, checking for auto-submit...', { 
-        transcript, 
-        value, 
-        trimmedTranscript: transcript.trim(),
-        trimmedValue: value.trim()
-      })
-      
+    setIsRecording(isListening)
+  }, [isListening])
+
+  // Track processing and starting states for UI validation
+  const isProcessing = voiceState === 'processing'
+  const isStarting = voiceState === 'starting'
+
+  // Auto-submit when recording stops and we have transcript
+  useEffect(() => {
+    if (shouldAutoSubmit && !isListening && !isRecording && voiceState !== 'processing') {
       // Use the input value (which should have the transcript) or the transcript itself
       const textToSubmit = value.trim() || transcript.trim()
       
       if (textToSubmit) {
-        console.log('🎮 Auto-submitting voice input:', textToSubmit)
         setShouldAutoSubmit(false)
         setTimeout(() => {
           handleSubmit()
         }, 100)
       } else {
-        console.log('🎮 No text to submit, canceling auto-submit')
         setShouldAutoSubmit(false)
       }
     }
-  }, [shouldAutoSubmit, transcript, value, isListening])
+  }, [shouldAutoSubmit, transcript, value, isListening, isRecording, voiceState])
 
   const handleSubmit = () => {
     if (value.trim() && !disabled) {
-      console.log('🎮 Submitting answer:', value.trim())
       onSubmit(value.trim())
       resetTranscript() // Always reset after submit
     }
@@ -107,129 +105,77 @@ function AnswerInput({
     onClueRequest()
   }
 
-  // Push-to-Talk event handlers
-  const handlePushToTalkStart = async () => {
+  // Toggle recording event handler
+  const handleMicToggle = async () => {
     if (!voiceSupported || disabled) return
     
-    const logPrefix = BROWSER_INFO.isSafari ? '🦁 Safari Push-to-Talk start:' : '🎮 Push-to-Talk start requested'
-    console.log(logPrefix, { 
-      voiceSupported, 
-      disabled, 
-      permissionGranted,
-      voiceState,
-      isSafari: BROWSER_INFO.isSafari
-    })
+    // If permission denied, just request permission (don't toggle recording)
+    if (permissionGranted === false) {
+      requestPermission()
+      return
+    }
     
     // Mark user gesture for Safari AudioContext
     if (BROWSER_INFO.isSafari) {
       audioFeedback.markUserGesture()
     }
     
-    // If permission not granted, request it first
-    if (permissionGranted === false || permissionGranted === null) {
-      const permissionLogPrefix = BROWSER_INFO.isSafari ? '🦁 Safari: Requesting microphone permission...' : '🎮 Requesting microphone permission...'
-      console.log(permissionLogPrefix)
-      const granted = await requestPermission()
-      if (!granted) {
-        const deniedLogPrefix = BROWSER_INFO.isSafari ? '🦁 Safari: Permission denied' : '🎮 Permission denied, cannot start voice input'
-        console.log(deniedLogPrefix)
-        // Error message is already set by requestPermission
-        return
+    if (isRecording || isListening) {
+      // Stop recording
+      stopListening()
+      setShouldAutoSubmit(true) // Mark for auto-submit when stopped
+    } else {
+      // Start recording - clear everything first to prevent duplicates
+      resetTranscript()
+      onChange('') // Clear input field
+      
+      // If permission not granted, request it first
+      if (permissionGranted === false || permissionGranted === null) {
+        const granted = await requestPermission()
+        if (!granted) {
+          return
+        }
       }
+      
+      startListening()
     }
-    
-    console.log(BROWSER_INFO.isSafari ? '🦁 Safari Push-to-Talk started' : '🎮 Push-to-Talk started')
-    setIsPushToTalkHeld(true)
-    startPushToTalk()
   }
 
-  const handlePushToTalkEnd = () => {
-    if (!voiceSupported || !isPushToTalkHeld) return
-    
-    const logPrefix = BROWSER_INFO.isSafari ? '🦁 Safari Push-to-Talk ended:' : '🎮 Push-to-Talk ended, current state:'
-    console.log(logPrefix, { 
-      transcript, 
-      value, 
-      isListening,
-      isSafari: BROWSER_INFO.isSafari
-    })
-    setIsPushToTalkHeld(false)
-    stopPushToTalk()
-    
-    // Always mark for auto-submit, let the effect decide if there's text to submit
-    setShouldAutoSubmit(true)
-  }
-
-  // Handle mouse events
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Handle mic button click
+  const handleMicClick = (e: React.MouseEvent) => {
     e.preventDefault()
-    
-    // If permission denied, just request permission (don't start listening)
-    if (permissionGranted === false) {
-      console.log('🎮 Permission denied - requesting permission instead of starting Push-to-Talk')
-      requestPermission()
-      return
-    }
-    
-    handlePushToTalkStart()
-  }
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    e.preventDefault()
-    handlePushToTalkEnd()
-  }
-
-  // Handle touch events
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault()
-    
-    // If permission denied, just request permission (don't start listening)
-    if (permissionGranted === false) {
-      console.log('🎮 Permission denied - requesting permission instead of starting Push-to-Talk (touch)')
-      requestPermission()
-      return
-    }
-    
-    handlePushToTalkStart()
-  }
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault()
-    handlePushToTalkEnd()
+    handleMicToggle()
   }
 
   // Handle keyboard events for accessibility
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault()
-      if (!isPushToTalkHeld) {
-        handlePushToTalkStart()
-      }
+      handleMicToggle()
     }
   }
 
-  const handleKeyUp = (e: React.KeyboardEvent) => {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault()
-      handlePushToTalkEnd()
-    }
-  }
-
-  // Push-to-Talk button styling based on state
-  const getPushToTalkButtonStyle = () => {
+  // Mic button styling based on state
+  const getMicButtonStyle = () => {
     if (!voiceSupported) {
       return "bg-gray-800 cursor-not-allowed"
     }
     if (permissionGranted === false) {
       return "bg-yellow-600 hover:bg-yellow-700 active:bg-yellow-800"
     }
-    if (isListening || isPushToTalkHeld) {
-      return "bg-red-500 hover:bg-red-600 animate-pulse scale-110 shadow-lg shadow-red-500/50"
+    if (isRecording || isListening) {
+      return "bg-green-500 hover:bg-green-600 animate-pulse scale-110 shadow-lg shadow-green-500/50"
+    }
+    if (isStarting) {
+      return "bg-orange-500 hover:bg-orange-600 scale-110 shadow-lg shadow-orange-500/50"
+    }
+    if (isProcessing) {
+      return "bg-amber-500 hover:bg-amber-600 scale-110 shadow-lg shadow-amber-500/50"
     }
     return "bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
   }
 
-  const getPushToTalkButtonTitle = () => {
+  const getMicButtonTitle = () => {
     if (!voiceSupported) {
       return BROWSER_INFO.isSafari 
         ? "Voice input not supported in this version of Safari"
@@ -252,19 +198,27 @@ function AnswerInput({
         : voiceError
       return `Error: ${errorMsg}`
     }
-    if (isListening || isPushToTalkHeld) {
+    if (isRecording || isListening) {
       return BROWSER_INFO.isSafari
-        ? "Release to submit your answer (Safari)"
-        : "Release to submit your answer"
+        ? "Recording... Click to stop and submit (Safari)"
+        : "Recording... Click to stop and submit"
+    }
+    if (isStarting) {
+      return BROWSER_INFO.isSafari
+        ? "Starting microphone... Please wait (Safari)"
+        : "Starting microphone... Please wait"
+    }
+    if (isProcessing) {
+      return "Processing speech... Please wait"
     }
     if (permissionGranted === null) {
       return BROWSER_INFO.isSafari
-        ? "Hold to speak (Safari will request microphone permission)"
-        : "Hold to speak (will request microphone permission)"
+        ? "Click to start recording (Safari will request microphone permission)"
+        : "Click to start recording (will request microphone permission)"
     }
     return BROWSER_INFO.isSafari
-      ? "Hold to speak (Push-to-Talk Safari)"
-      : "Hold to speak (Push-to-Talk)"
+      ? "Click to start recording (Safari)"
+      : "Click to start recording"
   }
 
   return (
@@ -275,16 +229,18 @@ function AnswerInput({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${
-                isListening ? 'bg-red-500 animate-pulse' : 
-                voiceState === 'processing' ? 'bg-yellow-500' :
+                isListening ? 'bg-green-500 animate-pulse' : 
+                voiceState === 'starting' ? 'bg-orange-500 animate-pulse' :
+                voiceState === 'processing' ? 'bg-amber-500 animate-pulse' :
                 voiceState === 'error' ? 'bg-red-600' :
                 'bg-gray-500'
               }`} />
               <span className="text-sm text-gray-300">
-                {isListening ? 'Hold button and speak...' : 
-                 voiceState === 'processing' ? 'Processing...' :
+                {isListening ? 'Recording... Click mic to stop' : 
+                 voiceState === 'starting' ? 'Starting microphone...' :
+                 voiceState === 'processing' ? 'Processing speech...' :
                  voiceState === 'error' ? 'Error' :
-                 'Push-to-Talk ready'}
+                 'Click-to-Talk ready'}
               </span>
             </div>
             {/* Voice Status Indicator */}
@@ -317,26 +273,27 @@ function AnswerInput({
 
       {/* Main input area */}
       <div className="flex items-center space-x-2 mb-4">
-        {/* Push-to-Talk button */}
+        {/* Mic toggle button */}
         <button
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp} // Stop if mouse leaves while held
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
+          onClick={handleMicClick}
           onKeyDown={handleKeyDown}
-          onKeyUp={handleKeyUp}
           disabled={disabled || !voiceSupported}
-          className={`flex-shrink-0 w-12 h-12 ${getPushToTalkButtonStyle()} disabled:bg-gray-800 rounded-full flex items-center justify-center transition-all duration-200 relative select-none`}
-          title={getPushToTalkButtonTitle()}
+          className={`flex-shrink-0 w-12 h-12 ${getMicButtonStyle()} disabled:bg-gray-800 rounded-full flex items-center justify-center transition-all duration-200 relative select-none`}
+          title={getMicButtonTitle()}
           tabIndex={0}
         >
-          {(isListening || isPushToTalkHeld) ? (
-            // Recording icon with pulse animation
+          {(isRecording || isListening) ? (
+            // Recording icon with pulse animation (green)
             <div className="relative">
               <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
               <div className="absolute top-0 left-0 w-3 h-3 bg-white rounded-full animate-ping"></div>
             </div>
+          ) : isStarting ? (
+            // Starting spinner (orange)
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : isProcessing ? (
+            // Processing spinner (amber)
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
           ) : (
             // Microphone icon
             <MicrophoneIcon className="w-5 h-5 text-white" />
@@ -369,12 +326,16 @@ function AnswerInput({
               onChange(e.target.value)
             }}
             onKeyPress={handleKeyPress}
-            placeholder={isListening ? 'Listening... (hold button and speak)' : placeholder}
+            placeholder={isListening ? 'Recording... (click mic to stop)' : isStarting ? 'Starting microphone...' : isProcessing ? 'Processing speech...' : placeholder}
             disabled={disabled}
             className={`w-full h-12 px-6 pr-16 bg-gray-800 border rounded-full text-white placeholder-gray-400 focus:outline-none transition-colors duration-200 disabled:opacity-50 ${
               isListening
-                ? 'border-red-500 focus:border-red-400' 
-                : 'border-gray-600 focus:border-blue-500'
+                ? 'border-green-500 focus:border-green-400' 
+                : isStarting
+                  ? 'border-orange-500 focus:border-orange-400'
+                  : isProcessing
+                    ? 'border-amber-500 focus:border-amber-400'
+                    : 'border-gray-600 focus:border-blue-500'
             }`}
             style={{ fontSize: '16px' }} // Prevents zoom on iOS
           />
@@ -411,7 +372,7 @@ function AnswerInput({
         <div>
           <p>Type your answer and press Enter or tap the {value.trim() ? 'green' : 'blue'} arrow</p>
           {voiceSupported && permissionGranted !== false && (
-            <p className="mt-1">Or hold the microphone button while speaking (Push-to-Talk)</p>
+            <p className="mt-1">Or click the microphone button to start recording (Click-to-Talk)</p>
           )}
           {voiceSupported && permissionGranted === false && !voiceError?.includes('secure') && (
             <p className="mt-1 text-yellow-400">Microphone access denied - tap microphone to request permission</p>

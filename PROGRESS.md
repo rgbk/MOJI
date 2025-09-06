@@ -122,3 +122,40 @@ The multiplayer system is fully functional with:
 
 **MILESTONE: Complete Supabase Migration ✅**
 **STATUS: Production Ready with Full Feature Set 🚀**
+
+## 🎤 Voice Recognition Improvements (Sept 6, 2025)
+
+### Major Changes: Toggle Recording Mode
+- **Changed from push-to-talk to toggle mode** - Click to start, click to stop (much better for mobile!)
+- **Fixed auto-stopping bug** - Set `continuous: true` so recording doesn't stop when user pauses
+- **Improved UI feedback**:
+  - 🟢 Green = Recording
+  - 🟠 Orange = Starting microphone  
+  - 🟡 Amber = Processing speech
+- **Performance optimizations** - Removed excessive logging that was causing slowdowns
+
+### Critical Learnings
+#### ❌ **NEVER DO QUICK FIXES LIKE THIS:**
+- Added 2-second artificial delay for Safari → Made UX terrible!
+- Used sessionStorage for Safari → Clears on navigation
+- Appended transcripts → Caused duplicates like "Ocean eyesOcean eyes"
+- Excessive console logging → Serious performance impact
+
+#### ✅ **PROPER SOLUTIONS:**
+- Let Safari initialize at its natural speed (no artificial delays!)
+- Use localStorage for permission persistence
+- Replace transcripts instead of appending
+- Minimal, targeted debug logging only
+
+### Results
+- **Chrome Desktop**: Fast and smooth ✅
+- **Safari Desktop**: Working with natural init delay ✅
+- **Mobile**: Ready for testing (next step)
+
+### Technical Details
+- `useVoiceRecognition.ts`: Removed Safari delay, set continuous: true
+- `AnswerInput.tsx`: Implemented toggle behavior with proper UI states
+- Added 'starting' state to differentiate from 'processing'
+- Fixed localStorage permission loading
+
+**KEY LESSON: Don't add artificial delays or "workarounds" - fix the root cause!**

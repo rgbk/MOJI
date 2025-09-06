@@ -96,6 +96,21 @@ function DebugOverlay({ viewName, additionalInfo = {} }: DebugOverlayProps) {
     'voice_supported': voice.isSupported,
     'voice_listening': voice.isListening,
     
+    // Performance metrics
+    ...(voice.metrics && {
+      'perf_mobile': voice.metrics.isMobile,
+      'perf_browser': voice.metrics.browser,
+      'perf_permission_ms': voice.metrics.permissionTime?.toFixed(0),
+      'perf_start_ms': voice.metrics.recognitionStartTime && voice.metrics.startTime 
+        ? (voice.metrics.recognitionStartTime - voice.metrics.startTime).toFixed(0)
+        : undefined,
+      'perf_first_result_ms': voice.metrics.firstResultTime && voice.metrics.startTime
+        ? (voice.metrics.firstResultTime - voice.metrics.startTime).toFixed(0)
+        : undefined,
+      'perf_total_ms': voice.metrics.totalDuration?.toFixed(0),
+      'perf_result_count': voice.metrics.resultCount
+    }),
+    
     time: timestamp,
     
     ...additionalInfo

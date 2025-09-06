@@ -13,7 +13,7 @@ function MicrophoneSetup({ onPermissionGranted, compact = false, onDebugInfo }: 
   const { roomId } = useParams()
   const [isTestingMic, setIsTestingMic] = useState(false)
   
-  console.log('🎤 MicrophoneSetup component rendered for room:', roomId)
+  // MicrophoneSetup component rendered
   
   const {
     isSupported,
@@ -54,10 +54,10 @@ function MicrophoneSetup({ onPermissionGranted, compact = false, onDebugInfo }: 
     try {
       const granted = await requestPermission()
       if (granted) {
-        console.log('🎤 Microphone permission granted in lobby')
+        // Permission granted
       }
     } catch (err) {
-      console.error('🎤 Failed to request microphone permission:', err)
+      // Failed to request permission
     } finally {
       setIsTestingMic(false)
     }
